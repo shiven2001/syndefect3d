@@ -1,0 +1,33 @@
+# Minimal Living Room Configuration
+# Spawns: Ceiling Lights ONLY
+# NO sofas, NO coffee table, NO storage, NO other furniture
+
+# Use single room configuration
+BlueprintSolidifier.enable_open=False
+
+# Restrict to living room type
+restrict_solving.solve_max_rooms=1
+restrict_solving.restrict_parent_rooms=["LivingRoom"]
+
+# Filter to only ceiling light, and defect constraints
+# Keeps: livingroom , ceiling_lights, defects
+# Removes: sofa, sofa_positioning, tv, livingroom_objects
+restrict_solving.consgraph_filters=["ceiling_lights", "defects"]
+
+# Disable terrain and other features
+compose_indoors.terrain_enabled = False
+compose_indoors.hide_other_rooms_enabled = True
+
+# Disable object solving stages (no items, no sofas)
+compose_indoors.solve_small_enabled = False   # No small items
+compose_indoors.solve_medium_enabled = True   # Enable for defect planes (ceiling lights handled separately)
+compose_indoors.solve_large_enabled = False  
+
+# Extras
+compose_indoors.lights_off_chance = 0.0
+compose_indoors.skirting_floor_chance = 0.0
+compose_indoors.skirting_ceiling_chance = 0.0
+
+# Door settings - make ALL doors completely closed
+populate_doors.all_closed = True
+# populate_doors.door_chance = 0.0

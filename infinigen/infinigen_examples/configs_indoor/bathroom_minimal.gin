@@ -1,0 +1,33 @@
+# Minimal Bathroom Configuration
+# Spawns: Toilet, Bathtub (required), and Sink
+# NO secondary objects (no bottles, towels, etc.)
+# NO storage (no shelves)
+
+# Use single room configuration
+BlueprintSolidifier.enable_open=False
+
+# Restrict to bathroom room type
+restrict_solving.solve_max_rooms=1
+restrict_solving.restrict_parent_rooms=["Bathroom"]
+
+# Don't restrict primary/secondary children - let the constraint graph do it
+# The bathroom constraint requires: Mirror, Sink, Toilet
+# We'll use consgraph_filters to keep only bathroom fixtures
+
+# Filter constraint graph to ONLY bathroom fixture constraints
+# Keeps: bathroom (toilet+sink+mirror), toilet, bathtub, defects
+# Removes: storage-related constraints
+restrict_solving.consgraph_filters=["bathroom", "toilet", "bathtub", "defects"]
+
+# Disable terrain and other features
+compose_indoors.terrain_enabled = False
+compose_indoors.hide_other_rooms_enabled = True
+
+# Disable solving stages we don't need
+compose_indoors.solve_small_enabled = False  # No bathroom items (bottles, towels)
+compose_indoors.solve_medium_enabled = True  # Enable for defect planes
+compose_indoors.solve_large_enabled = True   # Keep large fixtures (toilet, sink, bathtub)
+
+# Door settings - make ALL doors completely closed
+populate_doors.all_closed = True
+# populate_doors.door_chance = 0.0

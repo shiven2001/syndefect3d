@@ -1,0 +1,33 @@
+# Minimal Bedroom Configuration
+# Spawns: EMPTY bedroom with NO objects
+# Just the room structure (walls, floor, ceiling)
+
+# Use single room configuration
+BlueprintSolidifier.enable_open=False
+
+# Restrict to bedroom room type
+restrict_solving.solve_max_rooms=1
+restrict_solving.restrict_parent_rooms=["Bedroom"]
+
+# Remove ALL bedroom constraints except defects
+# This prevents the requirement for bed and storage
+# But keeps defect planes
+restrict_solving.consgraph_filters=["defects"]
+
+# Disable terrain and other features
+compose_indoors.terrain_enabled = False
+compose_indoors.hide_other_rooms_enabled = True
+
+# Disable ALL object solving stages except defect planes
+compose_indoors.solve_small_enabled = False   # No small items
+compose_indoors.solve_medium_enabled = True   # Enable for defect planes
+compose_indoors.solve_large_enabled = False   # No large furniture
+
+# Extras
+compose_indoors.lights_off_chance = 0.0
+compose_indoors.skirting_floor_chance = 0.0
+compose_indoors.skirting_ceiling_chance = 0.0
+
+# Door settings - make ALL doors completely closed
+populate_doors.all_closed = True
+# populate_doors.door_chance = 0.0

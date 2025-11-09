@@ -1,0 +1,37 @@
+# Minimal Kitchen Configuration
+# Spawns: Kitchen Counters and Sink ONLY (NO appliances like fridge/dishwasher)
+# Note: Cabinets are built-in to KitchenSpaceFactory, not separate objects
+
+# Use single room configuration
+BlueprintSolidifier.enable_open=False
+
+# Restrict to kitchen room type
+restrict_solving.solve_max_rooms=1
+restrict_solving.restrict_parent_rooms=["Kitchen"]
+
+# Don't restrict primary/secondary children - let the constraint graph do it
+# Instead, we filter the constraint graph to only kitchen counter constraints
+
+# Filter constraint graph to ONLY kitchen counter/island/sink constraints
+# This removes kitchen_appliance and kitchen_barchairs constraints
+# Keeps: kitchen_counters, kitchen_island_placement, kitchen_sink, kitchen_objects
+# Also keeps: defects (for defect planes - now in separate category)
+restrict_solving.consgraph_filters=["kitchen_counter", "kitchen_island", "kitchen_sink", "kitchen_objects", "defects"]
+
+# Disable terrain and other features
+compose_indoors.terrain_enabled = False
+compose_indoors.hide_other_rooms_enabled = True
+
+# Disable solving stages we don't need
+compose_indoors.solve_small_enabled = False
+compose_indoors.solve_medium_enabled = True   # Enable for wall decorations (defect planes)
+compose_indoors.solve_large_enabled = True
+
+# Extras
+compose_indoors.lights_off_chance = 0.0
+compose_indoors.skirting_floor_chance = 0.0
+compose_indoors.skirting_ceiling_chance = 0.0
+
+# Door settings - make ALL doors completely closed
+populate_doors.all_closed = True  
+# populate_doors.door_chance = 0.0
