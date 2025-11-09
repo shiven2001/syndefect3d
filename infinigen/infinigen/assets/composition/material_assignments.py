@@ -245,16 +245,13 @@ graphicdesign = [  # bottle wrappers, books, etc
     (dev.BasicBSDF, 0.1),
 ]
 
-decorative_hard = (  # vases, plantpots
-    decorative_metal
-    + [
-        (ceramic.VaseCeramic, 4.0),
-        (ceramic.ColoredGlass, 2.0),
-        (ceramic.Marble, 1.0),
-        (ceramic.GlassVolume, 2.0),
-        (ceramic.Ceramic, 1.0),
-    ]
-)
+decorative_hard = decorative_metal + [  # vases, plantpots
+    (ceramic.VaseCeramic, 4.0),
+    (ceramic.ColoredGlass, 2.0),
+    (ceramic.Marble, 1.0),
+    (ceramic.GlassVolume, 2.0),
+    (ceramic.Ceramic, 1.0),
+]
 
 cup = decorative_hard + [
     (metal.MetalBasic, 2.0),
@@ -328,7 +325,7 @@ garage_floor = [
 utility_floor = [
     (ceramic.Concrete, 1.0),
     (ceramic.Plaster, 1.0),
-    (ceramic.tile, 1.0),
+    (ceramic.Tile, 1.0),
 ]
 bathroom_floor = [
     (ceramic.Tile, 1.0),
