@@ -14,3 +14,11 @@ List of custom nodes used in ComfyUI:
 10. comfyui-custom-scripts
 11. ComfyUI-Easy-Use
 12. ComfyUI-Manager
+
+
+
+python -m infinigen.datagen.manage_jobs --output_folder outputs/stereo_indoors --num_scenes 30 \
+--pipeline_configs local_256GB.gin stereo.gin
+
+
+python -m infinigen_examples.generate_indoors --seed 0 --task coarse --output_folder outputs/indoors/coarse11 -g singleroom.gin bedroom_minimal.gin --overrides camera.spawn_camera_rigs.n_camera_rigs=10 compute_base_views.min_candidates_ratio=20
