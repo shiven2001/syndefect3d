@@ -21,4 +21,4 @@ python -m infinigen.datagen.manage_jobs --output_folder outputs/stereo_indoors -
 --pipeline_configs local_256GB.gin stereo.gin
 
 
-python -m infinigen_examples.generate_indoors --seed 0 --task coarse --output_folder outputs/indoors/coarse11 -g singleroom.gin bedroom_minimal.gin --overrides camera.spawn_camera_rigs.n_camera_rigs=10 compute_base_views.min_candidates_ratio=20
+python -m infinigen_examples.generate_indoors --seed 0 --task coarse --output_folder outputs/indoors/coarse11 -g real_geometry.gin bedroom_minimal.gin --overrides camera.spawn_camera_rigs.n_camera_rigs=10 compute_base_views.min_candidates_ratio=20

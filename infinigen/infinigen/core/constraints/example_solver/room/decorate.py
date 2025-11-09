@@ -340,8 +340,8 @@ def room_floors(floors, n_floors=3, material_seed=1):
     floor_material_gens = []
     with FixedSeed(material_seed):
         for r in floors:
-            gen_class = weighted_sample(room_floor_fns[room_type(r.name)])
-            floor_material_gens.append(gen_class())
+            gen_class = weighted_sample(room_floor_fns[room_type(r.name)])()
+            floor_material_gens.append(gen_class)
 
     logger.debug(
         f"{room_floors.__name__} adding materials to {len(floors)=}, using {len(floor_material_gens)=}"

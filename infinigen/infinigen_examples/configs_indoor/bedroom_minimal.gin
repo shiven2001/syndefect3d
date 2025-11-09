@@ -9,10 +9,10 @@ BlueprintSolidifier.enable_open=False
 restrict_solving.solve_max_rooms=1
 restrict_solving.restrict_parent_rooms=["Bedroom"]
 
-# Remove ALL bedroom constraints except defects
+# Remove ALL bedroom constraints except defects and ceiling lights
 # This prevents the requirement for bed and storage
-# But keeps defect planes
-restrict_solving.consgraph_filters=["defects"]
+# But keeps defect planes and ceiling lights
+restrict_solving.consgraph_filters=["defects", "ceiling_lights"]
 
 # Disable terrain and other features
 compose_indoors.terrain_enabled = False

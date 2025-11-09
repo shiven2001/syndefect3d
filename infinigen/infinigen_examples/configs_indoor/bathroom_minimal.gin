@@ -15,9 +15,9 @@ restrict_solving.restrict_parent_rooms=["Bathroom"]
 # We'll use consgraph_filters to keep only bathroom fixtures
 
 # Filter constraint graph to ONLY bathroom fixture constraints
-# Keeps: bathroom (toilet+sink+mirror), toilet, bathtub, defects
+# Keeps: bathroom (toilet+sink+mirror), toilet, bathtub, defects, ceiling_lights
 # Removes: storage-related constraints
-restrict_solving.consgraph_filters=["bathroom", "toilet", "bathtub", "defects"]
+restrict_solving.consgraph_filters=["bathroom", "toilet", "bathtub", "defects", "ceiling_lights"]
 
 # Disable terrain and other features
 compose_indoors.terrain_enabled = False

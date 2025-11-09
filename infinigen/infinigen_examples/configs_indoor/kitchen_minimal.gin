@@ -16,7 +16,7 @@ restrict_solving.restrict_parent_rooms=["Kitchen"]
 # This removes kitchen_appliance and kitchen_barchairs constraints
 # Keeps: kitchen_counters, kitchen_island_placement, kitchen_sink, kitchen_objects
 # Also keeps: defects (for defect planes - now in separate category)
-restrict_solving.consgraph_filters=["kitchen_counter", "kitchen_island", "kitchen_sink", "kitchen_objects", "defects"]
+restrict_solving.consgraph_filters=["kitchen_counter", "kitchen_island", "kitchen_sink", "kitchen_objects", "defects", "ceiling_lights"]
 
 # Disable terrain and other features
 compose_indoors.terrain_enabled = False
