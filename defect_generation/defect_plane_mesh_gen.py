@@ -22,6 +22,7 @@ TEXTURE_MAP_TYPES = {
     "albedo": ["upscale", "basecolor", "albedo", "diffuse"],
     "roughness": ["rough", "roughness"],
     "normal": ["normal"],
+    "mask": ["mask"],
     "opacity": ["opacity", "alpha"],
     "height": ["height", "displacement", "bump"],
 }
@@ -106,17 +107,29 @@ def create_pbr_material(name, textures):
         print(f"  ✓ Loaded Normal")
         y_offset -= 300
 
-    # Opacity/Alpha
-    if textures.get("opacity"):
+    # Opacity/Alpha - Use mask texture for proper transparency
+    mask_texture = textures.get("mask") or textures.get("opacity")
+    if mask_texture:
         tex_opacity = nodes.new(type="ShaderNodeTexImage")
-        tex_opacity.location = (-400, y_offset)
-        tex_opacity.label = "Opacity"
-        tex_opacity.image = bpy.data.images.load(textures["opacity"])
+        tex_opacity.location = (-700, y_offset)
+        tex_opacity.label = "Opacity/Mask"
+        tex_opacity.image = bpy.data.images.load(mask_texture)
         tex_opacity.image.colorspace_settings.name = "Non-Color"
-        links.new(tex_opacity.outputs["Color"], bsdf.inputs["Alpha"])
+
+        # Invert the mask (if mask is black=defect, white=transparent, we need to flip it)
+        invert_node = nodes.new(type="ShaderNodeInvert")
+        invert_node.location = (-400, y_offset)
+        links.new(tex_opacity.outputs["Color"], invert_node.inputs["Color"])
+
+        # Connect inverted mask to Alpha
+        links.new(invert_node.outputs["Color"], bsdf.inputs["Alpha"])
+
+        # Set material for proper transparency export
         mat.blend_method = "BLEND"
-        mat.shadow_method = "HASHED"
-        print(f"  ✓ Loaded Opacity")
+        mat.shadow_method = "CLIP"
+        mat.use_backface_culling = False
+
+        print(f"  ✓ Loaded Opacity/Mask (inverted)")
         y_offset -= 300
 
     # Height/Displacement

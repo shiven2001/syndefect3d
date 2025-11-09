@@ -636,7 +636,9 @@ def home_furniture_constraints():
     mirror = walldec[wall_decorations.MirrorFactory]
 
     # Defects - separate category
-    defects = obj[Semantics.Defects].related_to(rooms, cu.flush_wall)
+    defects = obj[Semantics.Defects].related_to(
+        rooms, cu.flush_wall_defect
+    )  # Use defect-specific constraint
     defect_planes = defects[static_assets.StaticDefectPlaneFactory]
 
     rugs = obj[elements.RugFactory].related_to(rooms, cu.on_floor)

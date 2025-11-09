@@ -231,7 +231,14 @@ def room_walls(
             if wall_fn.__class__.__name__ == "Plaster":
                 for r in rooms__:
                     unwrap_normal(r, selection=None)
-            if wall_fn.__class__.__name__ == "Brick":
+            # Materials that don't accept tile-specific parameters
+            if wall_fn.__class__.__name__ in [
+                "Brick",
+                "Concrete",
+                "Plaster",
+                "Wood",
+                "Metal",
+            ]:
                 kwargs = {}
             surface.assign_material(rooms__, wall_fn(**kwargs))
 

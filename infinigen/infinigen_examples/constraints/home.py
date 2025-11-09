@@ -636,13 +636,19 @@ def home_furniture_constraints():
     mirror = walldec[wall_decorations.MirrorFactory]
 
     # Defects - separate category (on walls AND ceilings)
-    # Define flush_ceiling constraint (like flush_wall but for ceilings)
-    flush_ceiling = cl.StableAgainst(cu.back, cu.ceilingtags, margin=0.02)
+    # Define flush_ceiling_defect constraint (like flush_wall_defect but for ceilings)
+    flush_ceiling_defect = cl.StableAgainst(
+        cu.back, cu.ceilingtags, margin=0.001
+    )  # Nearly flush (1mm) for defects only
 
     # Get all defects first, then filter by wall or ceiling relation
     defects = obj[Semantics.Defects]
-    defects_wall = defects.related_to(rooms, cu.flush_wall)  # Flush against walls
-    defects_ceiling = defects.related_to(rooms, flush_ceiling)  # Flush against ceiling
+    defects_wall = defects.related_to(
+        rooms, cu.flush_wall_defect
+    )  # Flush against walls (defects only)
+    defects_ceiling = defects.related_to(
+        rooms, flush_ceiling_defect
+    )  # Flush against ceiling (defects only)
     defect_planes = defects[static_assets.StaticDefectPlaneFactory]
 
     rugs = obj[elements.RugFactory].related_to(rooms, cu.on_floor)
