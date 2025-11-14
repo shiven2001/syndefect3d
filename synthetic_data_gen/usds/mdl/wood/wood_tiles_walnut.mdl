@@ -1,0 +1,55 @@
+// exported by: omni.mdl.usd_converter [1.0.24]
+// --/exts/omni.mdl.usd_converter/enableNewDemangling=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExports=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExportUpwardLevels=-1
+
+mdl 1.8;
+
+import ::state::normal;
+import ::Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Wood::Wood_Tiles_Walnut::Wood_Tiles_Walnut;
+import ::tex::gamma_mode;
+
+export material Wood_Tiles_Walnut(*)
+ = Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Wood::Wood_Tiles_Walnut::Wood_Tiles_Walnut(
+    wood_color: color(0.5f, 0.5f, 0.5f),
+    age_dirt: 0.f,
+    wood_bump_strength: 0.6000000238f,
+    floor_brightness: 0.5f,
+    wood_brightness_variation: 0.5f,
+    wood_random_rotation: 0.02999999933f,
+    wood_scale: float2(0.200000003f),
+    wood_scale_variation: 0.f,
+    tiles_bump_strength: 0.400000006f,
+    tiles_random_slope_orientation: 0.05000000075f,
+    gaps_brightness: 0.3000000119f,
+    tiles_orange_peel_bump_factor: 0.f,
+    coating_reflectivity: 1.f,
+    tiles_base_roughness: 0.03999999911f,
+    base_roughness_range: 0.6000000238f,
+    dirt_and_spots_amount: 0.f,
+    edgewear_roughness_amount: 0.f,
+    texture_translate: float2(0.f),
+    texture_rotate: 0.f,
+    texture_scale: float2(1.f),
+    uv_space_index: 0,
+    round_corners: false,
+    roundcorner_radius_mm: 1.5f,
+    across_materials: false,
+    preview_wood_highlights: false,
+    isotropic_roughness: 0.3519999981f,
+    isotropic_roughness_range: 0.5659999847f,
+    isotropic_specular_brightness: 1.f,
+    wood_specular_level: 1.f,
+    aniso_attenuation: 0.4909999967f,
+    aniso_bsdf_width: 0.5080000162f,
+    aniso_bsdf_height: 0.6570000052f,
+    anisotropic_isotropic_balance: 0.3199999928f,
+    tex_srgb_wood_color: texture_2d("./wood_tiles_walnut_wood_walnut_diff.jpg", ::tex::gamma_srgb, ""),
+    tex_lin_wood_rough_detail: texture_2d("./wood_tiles_walnut_wood_walnut_rough_detail.jpg", ::tex::gamma_linear, ""),
+    tex_lin_wood_rough_grain: texture_2d("./wood_tiles_walnut_wood_walnut_rough_grain.jpg", ::tex::gamma_linear, ""),
+    tex_lin_wood_detail_norm: texture_2d("./wood_tiles_walnut_wood_walnut_norm.jpg", ::tex::gamma_linear, ""),
+    tex_lin_tiles_id_offset_rotation: texture_2d("./wood_tiles_walnut_brickbond_R_id_G_offs_B_rotation.png", ::tex::gamma_linear, ""),
+    tex_lin_tiles_edgewear_gaps_gapsrough: texture_2d("./wood_tiles_walnut_brickbond_R_edgewear_G_gaps_B_gaps_rough.jpg", ::tex::gamma_linear, ""),
+    tex_lin_tiles_normal: texture_2d("./wood_tiles_walnut_brickbond_norm.png", ::tex::gamma_linear, ""),
+    tex_lin_tiles_rough_dents_spots: texture_2d("./wood_tiles_walnut_tiles_wood_R_rough_G_dents_B_spots.jpg", ::tex::gamma_linear, ""),
+    tex_lin_tiles_orange_peel: texture_2d("./wood_tiles_walnut_tiles_wood_orangepeel_norm.jpg", ::tex::gamma_linear, ""));

@@ -1,0 +1,76 @@
+environments:
+  # List of background environments (list of folders or files)
+  folders: []
+  files:
+    - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_0/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_1/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_2/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_3/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_4/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_5/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_6/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_7/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_8/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_9/export_scene.blend/export_scene.usdc"
+
+capture:
+  # Number of captures (frames = total_captures * num_cameras)
+  total_captures: 27
+  # Number of captures per environment
+  num_captures_per_env: 27
+  # Resolution of the captured frames
+  resolution: [640, 640]
+  # Disable render products throughout the pipeline, enable them only when capturing the frames
+  disable_render_products: true
+  # Number of subframes to render (RayTracedLighting) to avoid temporal rendering artifacts (e.g. ghosting)
+  rt_subframes: 500
+  # Use PathTracing renderer instead of RayTracedLighting when capturing the frames
+  path_tracing: false
+  # Number of scene lights to create in the working area
+  num_scene_lights: 0
+
+writers:
+  # Type of the writer to use (e.g. PoseWriter, BasicWriter, etc.) and the kwargs to pass to the writer init
+  - type: BasicWriter
+    kwargs:
+      output_dir: "infinigen_basicwriters/_out_infinigen_basicwriter_pt_1"
+      rgb: true
+      instance_id_segmentation: true
+      semantic_segmentation: true
+      bounding_box_2d_tight: true
+      use_common_output_dir: false
+
+distractors:
+  # Shape distractors (unlabeled background assets) to drop in the scene (e.g. capsules, cones, cylinders)
+  shape_distractors:
+    # Amount of shape distractors to create
+    num: 0
+    # Chance to disable gravity for the shape distractors
+    gravity_disabled_chance: 0.25
+    # List of shape types to randomly choose from
+    types: ["capsule", "cone", "cylinder", "sphere", "cube"]
+
+  # Mesh distractors (unlabeled background assets) to drop in the scene
+  mesh_distractors:
+    # Amount of mesh distractors to create
+    num: 0
+    # Chance to disable gravity for the mesh distractors
+    gravity_disabled_chance: 0.25
+    # List of folders and files to search to randomly choose from
+    folders:
+      - /NVIDIA/Assets/DigitalTwin/Assets/Warehouse/Safety/Floor_Signs/
+      - /NVIDIA/Assets/DigitalTwin/Assets/Warehouse/Safety/Cones/
+    files:
+      - /Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxD_04_1847.usd
+      - /Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxA_01_414.usd
+      - /Isaac/Environments/Simple_Warehouse/Props/S_TrafficCone.usd
+      - /Isaac/Environments/Simple_Warehouse/Props/S_WetFloorSign.usd
+      - /Isaac/Environments/Office/Props/SM_Book_03.usd
+      - /Isaac/Environments/Office/Props/SM_Book_34.usd
+      - /Isaac/Environments/Office/Props/SM_BookOpen_01.usd
+      - /Isaac/Environments/Office/Props/SM_Briefcase.usd
+      - /Isaac/Environments/Office/Props/SM_Extinguisher.usd
+      - /Isaac/Environments/Hospital/Props/SM_MedicalBag_01a.usd
+      - /Isaac/Environments/Hospital/Props/SM_MedicalBox_01g.usd
+
+debug_mode: true

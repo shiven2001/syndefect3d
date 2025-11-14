@@ -1,0 +1,22 @@
+// exported by: omni.mdl.usd_converter [1.0.24]
+// --/exts/omni.mdl.usd_converter/enableNewDemangling=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExports=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExportUpwardLevels=-1
+
+mdl 1.8;
+
+import ::state::normal;
+import ::Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Plaster::Plaster_Wall::Plaster_Wall_Slightly_Cracked;
+
+export material Plaster_Wall_Slightly_Cracked(*)
+ = Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Plaster::Plaster_Wall::Plaster_Wall_Slightly_Cracked(
+    diffuse_tint: color(0.8379999995f, 0.8019999862f, 0.7749999762f),
+    diffuse_brightness: 0.47299999f,
+    roughness: 0.400000006f,
+    wall_weathering: 0.349999994f,
+    crack_darkening_weight: 0.3219999969f,
+    cracks_bump_factor: 0.25f,
+    texture_translate: float2(0.f),
+    texture_rotate: 0.f,
+    texture_scale: float2(1.f),
+    uv_space_index: 0);

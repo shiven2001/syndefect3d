@@ -1,0 +1,57 @@
+// exported by: omni.mdl.usd_converter [1.0.24]
+// --/exts/omni.mdl.usd_converter/enableNewDemangling=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExports=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExportUpwardLevels=-1
+
+mdl 1.8;
+
+import ::state::normal;
+import ::Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Wood::Wood_Tiles_Poplar_Multicolor::Wood_Tiles_Poplar_Multicolor;
+import ::tex::gamma_mode;
+
+export material Wood_Tiles_Poplar_Multicolor(*)
+ = Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Wood::Wood_Tiles_Poplar_Multicolor::Wood_Tiles_Poplar_Multicolor(
+    seed: 0,
+    wood_color: color(0.5034499764f, 0.00925999973f, 0.00925999973f),
+    wood_secondary_color: color(0.9287400246f, 0.6480799913f, 0.0982099995f),
+    age_dirt: 0.400000006f,
+    wood_bump_strength: 0.3000000119f,
+    floor_brightness: 0.6000000238f,
+    wood_brightness_variation: 0.6000000238f,
+    wood_random_rotation: 0.01499999966f,
+    wood_scale: float2(1.399999976f),
+    tiles_bump_strength: 0.3000000119f,
+    tiles_random_slope_orientation: 0.150000006f,
+    gaps_brightness: 0.3000000119f,
+    tiles_base_roughness: 0.05999999866f,
+    base_roughness_range: 0.6000000238f,
+    tiles_orange_peel_bump_factor: 0.1000000015f,
+    coating_reflectivity: 1.f,
+    dirt_and_spots_amount: 0.3000000119f,
+    edgewear_roughness_amount: 0.200000003f,
+    texture_translate: float2(0.f),
+    texture_rotate: 0.f,
+    texture_scale: float2(1.f),
+    uv_space_index: 0,
+    round_corners: false,
+    roundcorner_radius_mm: 1.5f,
+    across_materials: false,
+    preview_wood_highlights: false,
+    isotropic_roughness: 0.3359999955f,
+    isotropic_roughness_range: 0.9179999828f,
+    isotropic_specular_brightness: 0.7870000005f,
+    wood_specular_level: 1.f,
+    aniso_attenuation: 0.4839999974f,
+    aniso_bsdf_width: 0.4429999888f,
+    aniso_bsdf_height: 0.6309999824f,
+    anisotropic_isotropic_balance: 0.4339999855f,
+    tex_srgb_wood_color: texture_2d("./wood_tiles_polarmulti_poplar_diff.jpg", ::tex::gamma_srgb, ""),
+    tex_lin_wood_rough_detail: texture_2d("./wood_tiles_polarmulti_poplar_rough_detail.jpg", ::tex::gamma_linear, ""),
+    tex_lin_wood_rough_grain: texture_2d("./wood_tiles_polarmulti_poplar_rough_grain.jpg", ::tex::gamma_linear, ""),
+    tex_lin_wood_detail_norm: texture_2d("./wood_tiles_polarmulti_poplar_norm.jpg", ::tex::gamma_linear, ""),
+    tex_lin_tiles_id_offset_rotation: texture_2d("./wood_tiles_polarmulti_melbury_R_id_G_offset_B_rotation.png", ::tex::gamma_linear, ""),
+    tex_lin_tiles_edgewear_gaps_gapsrough: texture_2d("./wood_tiles_polarmulti_melbury_R_edgewear_G_gaps_B_gaps_rough.jpg", ::tex::gamma_linear, ""),
+    tex_lin_tiles_normal: texture_2d("./wood_tiles_polarmulti_melbury_norm.jpg", ::tex::gamma_linear, ""),
+    tex_lin_tiles_R_2nd_col_G_randmask: texture_2d("./wood_tiles_polarmulti_melbury_R_2ndcol_G_randmask.png", ::tex::gamma_linear, ""),
+    tex_lin_tiles_rough_dents_spots: texture_2d("./wood_tiles_polarmulti_tiles_wood_R_rough_G_dents_B_spots.jpg", ::tex::gamma_linear, ""),
+    tex_lin_tiles_orange_peel: texture_2d("./wood_tiles_polarmulti_tiles_wood_orangepeel_norm.jpg", ::tex::gamma_linear, ""));

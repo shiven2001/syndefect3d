@@ -1,0 +1,22 @@
+// exported by: omni.mdl.usd_converter [1.0.24]
+// --/exts/omni.mdl.usd_converter/enableNewDemangling=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExports=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExportUpwardLevels=-1
+
+mdl 1.8;
+
+import ::state::normal;
+import ::Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Paint::Chalk_Paint::Chalk_Paint_Elation;
+
+export material Chalk_Paint_Elation(*)
+ = Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Paint::Chalk_Paint::Chalk_Paint_Elation(
+    infinite_tiling: true,
+    patch_size: 0.8999999762f,
+    paint_color: color(0.6646419764f, 0.6596429944f, 0.7002099752f),
+    paint_brightness: 0.6999999881f,
+    paint_roughness: 0.8999999762f,
+    bump_strength: 0.6999999881f,
+    texture_translate: float2(0.f),
+    texture_rotate: 0.f,
+    texture_scale: float2(1.f),
+    uv_space_index: 0);

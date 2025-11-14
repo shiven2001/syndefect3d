@@ -1,0 +1,682 @@
+/******************************************************************************
+ *	 Copyright 2024 NVIDIA Corporation. All rights reserved.	 *
+ ******************************************************************************
+ 
+Permission is hereby granted by NVIDIA Corporation ("NVIDIA"), free of charge,
+to any person obtaining a copy of the sample definition code that uses our 
+Material Definition Language (the "MDL Materials"), to reproduce and distribute
+the MDL Materials, including without limitation the rights to use, copy, merge,
+publish, distribute, and sell modified and unmodified copies of the MDL 
+Materials, and to permit persons to whom the MDL Materials is furnished to do
+so, in all cases solely for use with NVIDIA's Material Definition Language,
+subject to the following further conditions:
+
+1. The above copyright notices, this list of conditions, and the disclaimer
+that follows shall be retained in all copies of one or more of the MDL
+Materials, including in any software with which the MDL Materials are bundled,
+redistributed, and/or sold, and included either as stand-alone text files,
+human-readable headers or in the appropriate machine-readable metadata fields
+within text or binary files as long as those fields can be easily viewed by the
+user, as applicable.
+2. The name of NVIDIA shall not be used to promote, endorse or advertise any 
+Modified Version without specific prior written permission, except a) to comply
+ with the notice requirements otherwise contained herein; or b) to acknowledge
+the contribution(s) of NVIDIA.
+
+THE MDL MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF COPYRIGHT, PATENT,
+TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR 
+ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING ANY GENERAL, SPECIAL, 
+INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF 
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE
+THE MDL MATERIALS OR FROM OTHER DEALINGS IN THE MDL MATERIALS.
+*/
+
+
+mdl 1.5;
+
+import ::anno::*;
+import ::base::*;
+import ::df::*;
+import ::math::*;
+import ::state::*;
+import ::tex::*;
+import ::nvidia::core_definitions::blend_colors;
+import ::nvidia::core_definitions::dimension;
+
+
+const string COPYRIGHT = 
+" Copyright 2024 NVIDIA Corporation. All rights reserved.\n"
+" MDL MATERIALS ARE PROVIDED PURSUANT TO AN END USER LICENSE  AGREEMENT,\n"
+" WHICH WAS ACCEPTED IN ORDER TO GAIN ACCESS TO THIS FILE.  IN PARTICULAR,\n" 
+" THE MDL MATERIALS ARE PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\n"
+" EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF\n"
+" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF\n" 
+" COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL NVIDIA\n"
+" CORPORATION BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING ANY\n"
+" GENERAL, SPECIAL,  INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, WHETHER IN\n"
+" AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF THE USE OR\n"
+" INABILITY TO USE THE MDL MATERIALS OR FROM OTHER DEALINGS IN THE MDL MATERIALS.\n";
+
+const string DESCRIPTION = "Versatile glass material with features such as ceramic frit, coating, dirt and smudges.";
+
+
+export enum unit_scale
+[[
+	::anno::hidden()
+]]
+{
+	unit_mm = 1,
+	unit_cm = 2,
+	unit_m = 3
+};
+
+struct volume_info
+[[
+	::anno::hidden()
+]]
+{
+	color absorption_coefficient;
+	color scattering_coefficient;
+};
+
+
+
+// simplified volume coefficients
+// This function takes a transmittance value and and albedo and translates it into meaningful
+// scattering and volume coefficients that are userfriendly
+//
+volume_info volume_transmittance_albedo(
+	uniform float density_scale = 1.0,
+	uniform color transmittance = color(0.5f), // transmittance color after unit distance
+	uniform color albedo = color(1.0f)
+)
+{
+	color sigma_t = -::math::log(::math::saturate(transmittance)) * density_scale;
+	color sigma_s = sigma_t * ::math::saturate(albedo);
+	return volume_info(
+		scattering_coefficient: sigma_s,
+		absorption_coefficient: sigma_t - sigma_s);
+}
+
+// This function calculates the apropriate scattering and volume coefficients
+// for a material of a given thickness. 
+// The user specifies the thickness of the material, e.g. 3mm and the amount 
+// of light passing through. The rest is automatically calculated for the material
+// and the material_volume is returned.
+volume_info custom_volume_transmittance(
+	uniform unit_scale unit_scale_select = unit_mm,
+	uniform float absorption_thickness = 3.0f,
+	uniform color transmittance = color(0.5f),
+	uniform color albedo = color(0.0f)
+)
+{
+	absorption_thickness = (absorption_thickness <= 0.0f) ? 0.00001 : absorption_thickness;
+	float scalefactor;
+	switch(unit_scale_select){
+		case unit_mm: scalefactor = 0.001f; break;
+		case unit_cm: scalefactor = 0.01f; break;
+		case unit_m: scalefactor = 1.0f; break;
+		default: scalefactor = 1.0f;
+	}
+	
+	
+	
+	volume_info vol_coefficients = volume_transmittance_albedo(
+												density_scale: 1.0f/(absorption_thickness * scalefactor),
+												transmittance: transmittance,
+												albedo: albedo
+	);
+	
+	return vol_coefficients;
+}
+
+
+float3 srgb2rgb(float3 val)
+{
+	return ::math::pow(::math::max(val, float3(0.0f)), 2.2);
+}
+
+
+float uint2float(int x)
+{
+	return float(x & 0x7FFFFFFF) + (x < 0 ? 2147483648.0 : 0.0);
+}
+
+int lowbias32(int x)
+{
+	x ^= x >>> 16;
+	x *= 0x7feb352d;
+	x ^= x >>> 15;
+	x *= 0x846ca68b;
+	x ^= x >>> 16;
+	return x;
+}
+
+float2 rnd22(int2 p) {
+	float2 ret_val = float2(
+		uint2float(lowbias32(p[0] + lowbias32(p[1]))) / 4294967296.f,
+		uint2float(lowbias32(p[0] + 32000 + lowbias32(p[1]))) / 4294967296.f
+	);
+	return ret_val;
+}   
+
+
+::base::texture_coordinate_info transform_coordinate_2(
+	float4x4 transform										 
+		[[ ::anno::description("A transformation to be applied to the source coordinates. rotation_translation_scale() is a suggested means to compute the transformation matrix.") ]],
+	::base::texture_coordinate_info coordinate = ::base::texture_coordinate_info()
+		[[ ::anno::description("Coordinate, typically sourced from coordinate_source or coordinate_projection.") ]]
+) [[ 
+	::anno::description("Transform a texture coordinate by a matrix.") ,
+	::anno::noinline()
+  ]]
+{
+	float4 r_position = float4(coordinate.position.x,coordinate.position.y,coordinate.position.z,1)* transform;
+	float4 r_tangent_u = float4(coordinate.tangent_u.x,coordinate.tangent_u.y,coordinate.tangent_u.z,1)* transform;
+	float4 r_tangent_v = float4(coordinate.tangent_v.x,coordinate.tangent_v.y,coordinate.tangent_v.z,1)* transform;
+	return ::base::texture_coordinate_info(
+		float3(r_position.x,r_position.y,r_position.z),
+		float3(r_tangent_u.x,r_tangent_u.y,r_tangent_u.z), // orthogonalization
+		float3(r_tangent_v.x,r_tangent_v.y,r_tangent_v.z));// orthogonalization
+}
+
+
+// Takes the standard input that every material has. It combines a couple of
+// functions in one convenience function.
+::base::texture_coordinate_info vmat_transform(
+								float2 translation = float2(0.0, 0.0),
+								float rotation	 = 0.0,				// rotation in degrees
+								float2 scaling	 = float2(1.0, 1.0),
+								uniform ::base::texture_coordinate_system system = ::base::texture_coordinate_uvw,
+								uniform int uv_space	   = 0
+)
+{
+	float rotation_rad = (rotation * 3.1415926535897932384626433832f) / 180.f;
+	float4x4 scale =
+	float4x4(1.0 /scaling.x, 0.			 ,  0. ,	 0.,
+			 0.			, 1.0 /scaling.y ,  0. ,	 0.,
+			 0.			, 0.			 ,  1.0,	 0.,
+			 translation.x , translation.y  ,  0.0,	 1.);
+
+	float s = ::math::sin(rotation_rad);
+	float c = ::math::cos(rotation_rad);
+	float4x4 rotate =
+	float4x4(  c  ,  -s   , 0.0 , 0.0,
+			   s  ,   c   , 0.0 , 0.0,
+			   0.0,   0.0 , 1.0 , 0.0,
+			   0. ,   0.0 , 0.0 , 1.);
+	
+	return transform_coordinate_2(scale*rotate, ::base::coordinate_source(system, uv_space));
+}
+
+float2x2 invert_2x2(float2x2 M)
+{
+	float det = M[0][0]*M[1][1] - M[0][1]*M[1][0];
+	//https://www.chilimath.com/lessons/advanced-algebra/inverse-of-a-2x2-matrix/
+	return (1.0 / det) * float2x2(M[1][1], -M[0][1], -M[1][0], M[0][0]);
+}
+
+float3 nonrepeat_lookup(
+	uniform texture_2d texture = texture_2d(),
+	::base::texture_coordinate_info uvw = ::base::coordinate_source(),
+	float texture_scale = 1.0,
+	float3 average_color = float3(0.5),
+	float patch_size = 8.0
+)
+{
+	
+	float2 uv_in = float2(uvw.position[0], uvw.position[1]) * texture_scale;
+	float Z =  patch_size;	 // patch scale inside example texture
+	float CON = 1.0f;
+	
+	float3 O = float3(0.f);
+	float2x2 M0 = float2x2(1.f,0.f, 0.5f, ::math::sqrt(3.f)/2.f);
+	float2x2 M = invert_2x2(M0); // transform matrix <-> tilted space
+	
+	float2 U = uv_in;
+	float2 V = M * uv_in; //pre-tilted hexa coordinates
+	int2 I = int2(::math::floor(V)); // hexa-tile id
+	
+	// The mean color needs to be determined in Photoshop then to make the
+	// average color work out, take the float value and calculate the apropriate
+	// mean value as (value^(1/2.2))
+
+	float3 m = average_color;
+	
+	float3 F = float3(::math::frac(V)[0], ::math::frac(V)[1], 0.f), W;
+	F[2] = 1.0 - F[0] - F[1]; // local hexa coordinates
+	
+	if( F[2] > 0.f )
+
+		O = (W[0] = F[2]) * (( ::tex::lookup_float3(texture, U/Z-rnd22(I))) - m*float(CON))
+		  + (W[1] = F[1]) * (( ::tex::lookup_float3(texture, U/Z-rnd22(I+int2(0,1)))) - m*float(CON))
+		  + (W[2] = F[0]) * (( ::tex::lookup_float3(texture, U/Z-rnd22(I+int2(1,0)))) - m*float(CON));
+	else
+		O = (W[0] =	  -F[2]) * (( ::tex::lookup_float3(texture, U/Z-rnd22(I+int2(1))))   - m*float(CON))
+		  + (W[1] = 1.f - F[1]) * (( ::tex::lookup_float3(texture, U/Z-rnd22(I+int2(1, 0)))) - m*float(CON))
+		  + (W[2] = 1.f - F[0]) * (( ::tex::lookup_float3(texture, U/Z-rnd22(I+int2(0, 1)))) - m*float(CON));
+	O = m + O/::math::length(W);
+	O = ::math::clamp( (O), 0.0, 1.0);
+	
+	return float3(O);
+}
+
+
+float remap_xy_to_0_1(float input, float x, float y)
+{
+	return (input - x)/(y - x);
+}
+
+float histogram_scan_big(float input, float width, float position)
+{
+	return ::math::clamp(
+				remap_xy_to_0_1(input,
+					::math::lerp(-width, 1.0, position),
+					::math::lerp(0.0, 1.0 + width, position)),
+				0.0,
+				1.0);
+}
+
+color endless_texture(
+	uniform texture_2d texture = texture_2d(),
+	::base::texture_coordinate_info uvw = ::base::coordinate_source(),
+	float texture_scale = 10.0,
+	float3 average_color = float3(0.5, 0.5, 1.0),
+	float patch_size = 8.0,
+	bool gamma_correct_lookup = true
+)
+{
+	return gamma_correct_lookup ? color(srgb2rgb(
+			nonrepeat_lookup (
+				texture: texture,
+				uvw: uvw,
+				texture_scale: texture_scale,
+				average_color: average_color,
+				patch_size: patch_size
+			))
+		) : color(nonrepeat_lookup (
+			texture: texture,
+			uvw: uvw,
+			texture_scale: texture_scale,
+			average_color: average_color,
+			patch_size: patch_size
+		));
+}
+
+
+// ------------------------------- Pure Glass ------------------------------- 
+// 1.1
+
+// Glass_V1
+
+export material Glass_Clear(
+// Appearance
+	uniform bool infinite_tiling = false [[
+		::anno::description("Enables infinite tiling feature which removes repeating texture patterns. Note that depending on the material this feature changes the appearance of the material slightly."),
+		::anno::display_name("Infinite Tiling"),
+		::anno::in_group("Appearance")
+	]],
+	uniform bool thin_walled = false [[
+		::anno::description("Makes the material thin-walled. This changes the behavior of the material in a way that light attenuation is not calculated volumetrically as light travels through the geometry but at the light surface level. Thin walled geometry mustbe modeled as a single sheet without any volume."),
+		::anno::display_name("Thin Walled"),
+		::anno::in_group("Appearance")
+	]],
+	uniform float ior = 1.47f [[
+		::anno::description("Index of refraction."),
+		::anno::display_name("IOR"),
+		::anno::in_group("Appearance"),
+		::anno::soft_range(0.f, 0.f),
+		::anno::hard_range(0.f, 20.f)
+	]],
+	uniform float abbe_number = 0.f [[
+		::anno::description("Dispersion in relation to index of refraction."),
+		::anno::display_name("Abbe Number"),
+		::anno::in_group("Appearance"),
+		::anno::soft_range(0.f, 100.f)
+	]],
+	float roughness = 0.f [[
+		::anno::description("Creates a frosted look of the glass."),
+		::anno::display_name("Roughness"),
+		::anno::in_group("Appearance"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	uniform unit_scale units_absorption_thickness = unit_m [[
+		::anno::description("Chooses the units that are used for setting the absorption thickness. Can be meters, centimeters or millimeters."),
+		::anno::display_name("Units Absorption Thickness"),
+		::anno::enable_if("thin_walled == false"),
+		::anno::in_group("Appearance")
+	]],
+	uniform float absorption_thickness = 1.f [[
+		::anno::description("The thickness for which the transmittance (color) is set. Example: If thickness is set to 3mm and transmittance to 0.8, then 80% of the light will pass through a 3mm thick material."),
+		::anno::display_name("Absorption Thickness"),
+		::anno::enable_if("thin_walled == false"),
+		::anno::in_group("Appearance"),
+		::anno::soft_range(0.f, 10.f)
+	]],
+	uniform color transmittance = color(0.68f) [[
+		::anno::description("The transmittance sets the amount of light that is left after light has travelled through a given material thickness which can be set with the parameter \"absorption thickness\". The transmittance can be set for RGB components separately to achieve a tinted appearance of the material."),
+		::anno::display_name("Transmittance"),
+		::anno::in_group("Appearance")
+	]],
+
+
+
+// Coating
+	float coating_reflectivity = 0.0f [[
+		::anno::description("Adjusts the reflectivity of the coating - the amount of light that gets reflected before it transfers through the glass surface."),
+		::anno::display_name("Coating Reflectivity"),
+		::anno::in_group("Appearance", "Coating"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	color coating_tint = color(1.f, 1.f, 1.f) [[
+		::anno::display_name("Coating Tint"),
+		::anno::description("Adds a color to the coating layer."),
+		::anno::enable_if("coating_reflectivity > 0.0"),
+		::anno::in_group("Appearance", "Coating")
+	]],
+	
+// Frit
+	uniform float frit_weight = 0.f [[
+		::anno::description("Controls the weight of the frit layer."),
+		::anno::display_name("Frit Layer Weight"),
+		::anno::in_group("Appearance", "Frit"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	color frit_color = color(0.78f) [[
+		::anno::display_name("Frit Color"),
+		::anno::enable_if("frit_weight > 0.0"),
+		::anno::in_group("Appearance", "Frit")
+	]],	
+	float frit_size = 0.363f [[
+		::anno::description("Controls the size of the frit circles."),
+		::anno::display_name("Frit Size"),
+		::anno::enable_if("frit_weight > 0.0"),
+		::anno::in_group("Appearance", "Frit"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float frit_roughness = 0.286f [[
+		::anno::description("Controls the roughness of the frit layer."),
+		::anno::display_name("Frit Roughness"),
+		::anno::enable_if("frit_weight > 0.0"),
+		::anno::in_group("Appearance", "Frit"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float2 frit_scale = float2(1.f) [[
+		::anno::description("Larger numbers increase the size."),
+		::anno::display_name("Frit Scale"),
+		::anno::enable_if("frit_weight > 0.0"),
+		::anno::in_group("Appearance", "Frit"),
+		::anno::soft_range(float2(0.f), float2(2.f))
+	]],
+	float reflection_transmission_balance = 0.f [[
+		::anno::description("Makes the frit translucent."),
+		::anno::display_name("Frit Translucency"),
+		::anno::enable_if("frit_weight > 0.0"),
+		::anno::in_group("Appearance", "Frit"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	
+// Dirt
+	uniform float dirt_layer_weight = 0.f [[
+		::anno::description("Controls the visibility of the dirt layer."),
+		::anno::display_name("Dirt Layer Weight"),
+		::anno::in_group("Appearance", "Dirt"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float dirt_brightness = 0.75f [[
+		::anno::description("Sets the brightness of the dirt."),
+		::anno::display_name("Dirt Brightness"),
+		::anno::enable_if("dirt_layer_weight > 0.0"),
+		::anno::in_group("Appearance", "Dirt"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float dirt_weight_1 = 1.f [[
+		::anno::description("Dirty dried droplets."),
+		::anno::display_name("Dirt 1 Amount"),
+		::anno::enable_if("dirt_layer_weight > 0.0"),
+		::anno::in_group("Appearance", "Dirt"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float dirt_weight_2 = 1.f [[
+		::anno::description("Dirt with the appearance of a dust layer."),
+		::anno::display_name("Dirt 2 Amount"),
+		::anno::enable_if("dirt_layer_weight > 0.0"),
+		::anno::in_group("Appearance", "Dirt"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float dirt_weight_3 = 0.f [[
+		::anno::description("Dirt which shows some driet water flow stains."),
+		::anno::display_name("Dirt 3 Amount"),
+		::anno::enable_if("dirt_layer_weight > 0.0"),
+		::anno::in_group("Appearance", "Dirt"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float dirt_balance = 0.5f [[
+		::anno::description("Controls the balance of the dirt textures. A low value makes the dirt more visible, higher values make it less visible while maintaining its contours."),
+		::anno::display_name("Dirt Balance"),
+		::anno::enable_if("dirt_layer_weight > 0.0"),
+		::anno::in_group("Appearance", "Dirt"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float2 dirt_scale = float2(1.f) [[
+		::anno::description("Larger numbers increase the size."),
+		::anno::display_name("Dirt Scale"),
+		::anno::enable_if("dirt_layer_weight > 0.0"),
+		::anno::in_group("Appearance", "Dirt"),
+		::anno::soft_range(float2(0.f), float2(2.f))
+	]],
+
+// Smudges
+	uniform float smudges_weight = 0.f [[
+		::anno::description("Controls the visibility of the smudge layer."),
+		::anno::display_name("Smudge Layer Weight"),
+		::anno::in_group("Appearance", "Smudges"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float smudges_1_weight = 0.7f [[
+		::anno::description("Adjusts the weight of the primary smudges."),
+		::anno::display_name("Smudges 1 Weight"),
+		::anno::enable_if("smudges_weight > 0.0"),
+		::anno::in_group("Appearance", "Smudges"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float smudges_2_weight = 0.3f [[
+		::anno::description("Adjusts the weight of the secondary smudges."),
+		::anno::display_name("Smudges 2 Weight"),
+		::anno::enable_if("smudges_weight > 0.0"),
+		::anno::in_group("Appearance", "Smudges"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float smudge_balance = 0.5f [[
+		::anno::description("Balances the coverage of the smudges. A low value makes them more visible, higher make leave only stronger smudges visible."),
+		::anno::display_name("Smudge Balance"),
+		::anno::enable_if("smudges_weight > 0.0"),
+		::anno::in_group("Appearance", "Smudges"),
+		::anno::hard_range(0.f, 1.f)
+	]],
+	float2 smudge_scale = float2(1.f) [[
+		::anno::description("Larger numbers increase the size."),
+		::anno::display_name("Smudge Scale"),
+		::anno::enable_if("smudges_weight > 0.0"),
+		::anno::in_group("Appearance", "Smudges"),
+		::anno::soft_range(float2(0.f), float2(2.f))
+	]],
+	
+	
+//Transform
+	float2 texture_translate = float2(0.f) [[
+		::anno::description("Controls the position of the texture."),
+		::anno::display_name("Texture Translate"),
+		::anno::in_group("Transform")
+	]],
+	float texture_rotate = 0.f [[
+		::anno::description("Rotates angle of the texture in degrees."),
+		::anno::display_name("Texture Rotate"),
+		::anno::in_group("Transform"),
+		::anno::soft_range(0.f, 360.f)
+	]],
+	float2 texture_scale = float2(1.f) [[
+		::anno::description("Larger numbers increase the size."),
+		::anno::display_name("Texture Scale"),
+		::anno::in_group("Transform"),
+		::anno::soft_range(float2(0.f), float2(2.f)),
+		::nvidia::core_definitions::dimension(float2(1.0f, 1.0f))
+	]],
+	
+
+// Advanced
+	uniform int uv_space_index = 0 [[
+		::anno::description("uses the selected UV space index."),
+		::anno::display_name("UV Space Index"),
+		::anno::in_group("Advanced"),
+		::anno::soft_range(0, 4)
+	]],
+	float3 normal = ::state::normal() [[
+		::anno::description("Override this input to provide a custom normal for the material."),
+		::anno::display_name("Normal"),
+		::anno::in_group("Advanced")
+	]]
+)
+[[
+	::anno::author("NVIDIA vMaterials"),
+    ::anno::display_name("Glass Clear"),
+    ::anno::description(DESCRIPTION),
+	::anno::copyright_notice(COPYRIGHT),
+	::anno::thumbnail("./.thumbs/Glass_Clear.Glass_Clear.png"),
+	::anno::key_words(string[]("glass", "layered", "construction", "indoor", "outdoor", "design", "shiny", "AEC", "transparent", "clear", "smooth", "new", "refractive", "reflective"))
+]]
+ = 
+	let {
+		bool tmp0 = thin_walled;
+		material_surface tmp1(
+			smudges_weight > 0.f ? ::df::weighted_layer(::math::pow(::math::max(float3(infinite_tiling ? endless_texture(texture_2d("./textures/glass_smudges_clouds_multi.jpg", ::tex::gamma_linear), vmat_transform(texture_translate, texture_rotate, texture_scale * smudge_scale, ::base::texture_coordinate_uvw, uv_space_index), 10.f, float3(0.0590000004f, 0.050999999f, 0.125f), 8.f, false) : ::base::file_texture(texture_2d("./textures/glass_smudges_clouds_multi.jpg", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, texture_scale * smudge_scale, ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).tint)[0] * smudges_1_weight, float3(infinite_tiling ? endless_texture(texture_2d("./textures/glass_smudges_clouds_multi.jpg", ::tex::gamma_linear), vmat_transform(texture_translate, texture_rotate, texture_scale * smudge_scale, ::base::texture_coordinate_uvw, uv_space_index), 10.f, float3(0.0590000004f, 0.050999999f, 0.125f), 8.f, false) : ::base::file_texture(texture_2d("./textures/glass_smudges_clouds_multi.jpg", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, texture_scale * smudge_scale, ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).tint)[1] * smudges_2_weight), ::math::lerp(1.f, 3.f, smudge_balance)) * smudges_weight, ::df::microfacet_ggx_smith_bsdf(0.275000006f, 0.275000006f, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), dirt_layer_weight > 0.f ? ::df::weighted_layer(::math::pow(::math::max(::math::max(dirt_weight_1 * float3(infinite_tiling ? endless_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), 8.f, float3(0.0370000005f, 0.0759999976f, 0.0189999994f), 8.f, false) : ::base::file_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).tint)[0], dirt_weight_2 * float3(infinite_tiling ? endless_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), 8.f, float3(0.0370000005f, 0.0759999976f, 0.0189999994f), 8.f, false) : ::base::file_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).tint)[1]), dirt_weight_3 * float3(infinite_tiling ? endless_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), 8.f, float3(0.0370000005f, 0.0759999976f, 0.0189999994f), 8.f, false) : ::base::file_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).tint)[2]), ::math::lerp(1.f, 4.f, dirt_balance)) * dirt_layer_weight, ::df::weighted_layer(0.603000045f, ::df::diffuse_transmission_bsdf(::nvidia::core_definitions::blend_colors(color(0.00309600006f, 0.00284500001f, 0.00266300002f), color(0.522521973f, 0.43264699f, 0.373656988f), ::base::color_layer_blend, dirt_brightness, true).tint, ""), ::df::diffuse_reflection_bsdf(::nvidia::core_definitions::blend_colors(color(0.00309600006f, 0.00284500001f, 0.00266300002f), color(0.522521973f, 0.43264699f, 0.373656988f), ::base::color_layer_blend, dirt_brightness, true).tint, 0.f, ""), ::state::normal()), ::df::weighted_layer(coating_reflectivity, ::df::specular_bsdf(coating_tint, ::df::scatter_reflect, ""), frit_weight > 0.f ? ::df::weighted_layer(histogram_scan_big(::base::file_texture(texture_2d("./textures/glass_frit_dist.png", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, texture_scale * (frit_scale * 0.00999999978f), ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).mono, 0.0199999996f, 1.f - frit_size * 0.870000005f) * frit_weight, ::df::weighted_layer(reflection_transmission_balance * 0.400000006f, ::df::diffuse_transmission_bsdf(color(1.f, 1.f, 1.f), ""), ::df::custom_curve_layer(0.0580000021f, 1.f, 5.f, 1.f, ::df::microfacet_ggx_smith_bsdf(frit_roughness * frit_roughness, frit_roughness * frit_roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::diffuse_reflection_bsdf(frit_color, 0.f, ""), ::state::normal()), ::state::normal()), thin_walled ? ::df::fresnel_layer(ior, 1.f, ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, transmittance, ::state::texture_tangent_u(0), ::df::scatter_transmit, ""), ::state::normal()) : ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect_transmit, ""), ::state::normal()) : thin_walled ? ::df::fresnel_layer(ior, 1.f, ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, transmittance, ::state::texture_tangent_u(0), ::df::scatter_transmit, ""), ::state::normal()) : ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect_transmit, ""), ::state::normal()), ::state::normal()) : ::df::weighted_layer(coating_reflectivity, ::df::specular_bsdf(coating_tint, ::df::scatter_reflect, ""), frit_weight > 0.f ? ::df::weighted_layer(histogram_scan_big(::base::file_texture(texture_2d("./textures/glass_frit_dist.png", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, texture_scale * (frit_scale * 0.00999999978f), ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).mono, 0.0199999996f, 1.f - frit_size * 0.870000005f) * frit_weight, ::df::weighted_layer(reflection_transmission_balance * 0.400000006f, ::df::diffuse_transmission_bsdf(color(1.f, 1.f, 1.f), ""), ::df::custom_curve_layer(0.0580000021f, 1.f, 5.f, 1.f, ::df::microfacet_ggx_smith_bsdf(frit_roughness * frit_roughness, frit_roughness * frit_roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::diffuse_reflection_bsdf(frit_color, 0.f, ""), ::state::normal()), ::state::normal()), thin_walled ? ::df::fresnel_layer(ior, 1.f, ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, transmittance, ::state::texture_tangent_u(0), ::df::scatter_transmit, ""), ::state::normal()) : ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect_transmit, ""), ::state::normal()) : thin_walled ? ::df::fresnel_layer(ior, 1.f, ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, transmittance, ::state::texture_tangent_u(0), ::df::scatter_transmit, ""), ::state::normal()) : ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect_transmit, ""), ::state::normal()), ::state::normal()) : dirt_layer_weight > 0.f ? ::df::weighted_layer(::math::pow(::math::max(::math::max(dirt_weight_1 * float3(infinite_tiling ? endless_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), 8.f, float3(0.0370000005f, 0.0759999976f, 0.0189999994f), 8.f, false) : ::base::file_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).tint)[0], dirt_weight_2 * float3(infinite_tiling ? endless_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), 8.f, float3(0.0370000005f, 0.0759999976f, 0.0189999994f), 8.f, false) : ::base::file_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).tint)[1]), dirt_weight_3 * float3(infinite_tiling ? endless_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), 8.f, float3(0.0370000005f, 0.0759999976f, 0.0189999994f), 8.f, false) : ::base::file_texture(texture_2d("./textures/glass_dirt_multi_mask.jpg", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, dirt_scale * texture_scale, ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).tint)[2]), ::math::lerp(1.f, 4.f, dirt_balance)) * dirt_layer_weight, ::df::weighted_layer(0.603000045f, ::df::diffuse_transmission_bsdf(::nvidia::core_definitions::blend_colors(color(0.00309600006f, 0.00284500001f, 0.00266300002f), color(0.522521973f, 0.43264699f, 0.373656988f), ::base::color_layer_blend, dirt_brightness, true).tint, ""), ::df::diffuse_reflection_bsdf(::nvidia::core_definitions::blend_colors(color(0.00309600006f, 0.00284500001f, 0.00266300002f), color(0.522521973f, 0.43264699f, 0.373656988f), ::base::color_layer_blend, dirt_brightness, true).tint, 0.f, ""), ::state::normal()), ::df::weighted_layer(coating_reflectivity, ::df::specular_bsdf(coating_tint, ::df::scatter_reflect, ""), frit_weight > 0.f ? ::df::weighted_layer(histogram_scan_big(::base::file_texture(texture_2d("./textures/glass_frit_dist.png", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, texture_scale * (frit_scale * 0.00999999978f), ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).mono, 0.0199999996f, 1.f - frit_size * 0.870000005f) * frit_weight, ::df::weighted_layer(reflection_transmission_balance * 0.400000006f, ::df::diffuse_transmission_bsdf(color(1.f, 1.f, 1.f), ""), ::df::custom_curve_layer(0.0580000021f, 1.f, 5.f, 1.f, ::df::microfacet_ggx_smith_bsdf(frit_roughness * frit_roughness, frit_roughness * frit_roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::diffuse_reflection_bsdf(frit_color, 0.f, ""), ::state::normal()), ::state::normal()), thin_walled ? ::df::fresnel_layer(ior, 1.f, ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, transmittance, ::state::texture_tangent_u(0), ::df::scatter_transmit, ""), ::state::normal()) : ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect_transmit, ""), ::state::normal()) : thin_walled ? ::df::fresnel_layer(ior, 1.f, ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, transmittance, ::state::texture_tangent_u(0), ::df::scatter_transmit, ""), ::state::normal()) : ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect_transmit, ""), ::state::normal()), ::state::normal()) : ::df::weighted_layer(coating_reflectivity, ::df::specular_bsdf(coating_tint, ::df::scatter_reflect, ""), frit_weight > 0.f ? ::df::weighted_layer(histogram_scan_big(::base::file_texture(texture_2d("./textures/glass_frit_dist.png", ::tex::gamma_linear), color(0.f, 0.f, 0.f), color(1.f, 1.f, 1.f), ::base::mono_average, vmat_transform(texture_translate, texture_rotate, texture_scale * (frit_scale * 0.00999999978f), ::base::texture_coordinate_uvw, uv_space_index), float2(0.f, 1.f), float2(0.f, 1.f), ::tex::wrap_repeat, ::tex::wrap_repeat, false).mono, 0.0199999996f, 1.f - frit_size * 0.870000005f) * frit_weight, ::df::weighted_layer(reflection_transmission_balance * 0.400000006f, ::df::diffuse_transmission_bsdf(color(1.f, 1.f, 1.f), ""), ::df::custom_curve_layer(0.0580000021f, 1.f, 5.f, 1.f, ::df::microfacet_ggx_smith_bsdf(frit_roughness * frit_roughness, frit_roughness * frit_roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::diffuse_reflection_bsdf(frit_color, 0.f, ""), ::state::normal()), ::state::normal()), thin_walled ? ::df::fresnel_layer(ior, 1.f, ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, transmittance, ::state::texture_tangent_u(0), ::df::scatter_transmit, ""), ::state::normal()) : ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect_transmit, ""), ::state::normal()) : thin_walled ? ::df::fresnel_layer(ior, 1.f, ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect, ""), ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, transmittance, ::state::texture_tangent_u(0), ::df::scatter_transmit, ""), ::state::normal()) : ::df::microfacet_ggx_smith_bsdf(roughness * roughness, roughness * roughness, color(1.f, 1.f, 1.f), ::state::texture_tangent_u(0), ::df::scatter_reflect_transmit, ""), ::state::normal()),
+			material_emission(emission: edf(), intensity: color(0.f, 0.f, 0.f), mode: intensity_radiant_exitance));
+		material_surface tmp2 = material_surface(scattering: bsdf(), emission: material_emission(emission: edf(), intensity: color(0.f, 0.f, 0.f), mode: intensity_radiant_exitance));
+		color tmp3 = ::base::abbe_number_ior(ior, abbe_number);
+		material_volume tmp4 = thin_walled ? material_volume(scattering: vdf(), absorption_coefficient: color(0.f, 0.f, 0.f), scattering_coefficient: color(0.f, 0.f, 0.f)) : material_volume(vdf(), custom_volume_transmittance(units_absorption_thickness, absorption_thickness, transmittance, color(0.f, 0.f, 0.f)).absorption_coefficient, custom_volume_transmittance(units_absorption_thickness, absorption_thickness, transmittance, color(0.f, 0.f, 0.f)).scattering_coefficient);
+		material_geometry tmp5(
+			float3(0.f),
+			1.f,
+			normal);
+	} in
+		material(
+			thin_walled: tmp0,
+			surface: tmp1,
+			backface: tmp2,
+			ior: tmp3,
+			volume: tmp4,
+			geometry: tmp5);
+			
+			
+			
+// ------------------------------- Pure Glass ------------------------------- 
+
+
+
+
+// 1.2
+export material Glass_Clear_Greenish(*)
+[[
+	::anno::author("NVIDIA vMaterials"),
+    ::anno::display_name("Glass Greenish"),
+    ::anno::description(DESCRIPTION),
+	::anno::copyright_notice(COPYRIGHT),
+	::anno::thumbnail("./.thumbs/Glass_Clear.Glass_Clear_Greenish.png"),
+	::anno::key_words(string[]("glass", "layered", "construction", "indoor", "outdoor", "design", "shiny", "AEC", "transparent", "clear", "smooth", "new", "refractive", "reflective"))
+]] = Glass_Clear
+(
+	infinite_tiling:		false,
+	thin_walled:			false,
+	ior:					1.47f,
+	abbe_number:			0.f,
+	roughness: 				0.f,
+	units_absorption_thickness: unit_m ,
+	absorption_thickness:	1.f,
+	transmittance: 			color(0.270498f, 0.679542f, 0.456411f),
+// Coating	
+	coating_reflectivity: 	0.0f,
+	coating_tint: 			color(1.f, 1.f, 1.f),
+// Frit	
+	frit_weight:			0.f,
+	frit_color:				color(0.78f),
+	frit_size:				0.363f,
+	frit_roughness:			0.286f,
+	frit_scale:				float2(1.f),
+	reflection_transmission_balance: 0.f,
+// Dirt	
+	dirt_layer_weight:		0.f,
+	dirt_brightness:		0.75f,
+	dirt_weight_1:			1.f,
+	dirt_weight_2:			1.f,
+	dirt_weight_3:			0.f,
+	dirt_balance:			0.5f,
+	dirt_scale:				float2(1.f),
+// Smudges	
+	smudges_weight:			0.f,
+	smudges_1_weight:		0.7f,
+	smudges_2_weight:		0.3f,
+	smudge_balance:			0.5f,
+	smudge_scale:			float2(1.f),
+//Transform	
+	texture_translate:		float2(0.f),
+	texture_rotate:			0.f,
+	texture_scale: 			float2(1.f),
+// Advanced	
+	uv_space_index:			0,
+	normal:					::state::normal()
+);
+
+
+// 1.3
+export material Glass_Clear_Blueish(*)
+[[
+	::anno::author("NVIDIA vMaterials"),
+    ::anno::display_name("Glass Blueish"),
+    ::anno::description(DESCRIPTION),
+	::anno::copyright_notice(COPYRIGHT),
+	::anno::thumbnail("./.thumbs/Glass_Clear.Glass_Clear_Blueish.png"),
+	::anno::key_words(string[]("glass", "layered", "construction", "indoor", "outdoor", "design", "shiny", "AEC", "transparent", "clear", "smooth", "new", "refractive", "reflective"))
+]] = Glass_Clear
+(
+	infinite_tiling:		false,
+	thin_walled:			false,
+	ior:					1.47f,
+	abbe_number:			0.f,
+	roughness: 				0.f,
+	units_absorption_thickness: unit_m ,
+	absorption_thickness:	1.f,
+	transmittance: 			color(0.341914f, 0.577580f, 0.672443f),
+// Coating	
+	coating_reflectivity: 	0.0f,
+	coating_tint: 			color(1.f, 1.f, 1.f),
+// Frit	
+	frit_weight:			0.f,
+	frit_color:				color(0.78f),
+	frit_size:				0.363f,
+	frit_roughness:			0.286f,
+	frit_scale:				float2(1.f),
+	reflection_transmission_balance: 0.f,
+// Dirt	
+	dirt_layer_weight:		0.f,
+	dirt_brightness:		0.75f,
+	dirt_weight_1:			1.f,
+	dirt_weight_2:			1.f,
+	dirt_weight_3:			0.f,
+	dirt_balance:			0.5f,
+	dirt_scale:				float2(1.f),
+// Smudges	
+	smudges_weight:			0.f,
+	smudges_1_weight:		0.7f,
+	smudges_2_weight:		0.3f,
+	smudge_balance:			0.5f,
+	smudge_scale:			float2(1.f),
+//Transform	
+	texture_translate:		float2(0.f),
+	texture_rotate:			0.f,
+	texture_scale: 			float2(1.f),
+// Advanced	
+	uv_space_index:			0,
+	normal:					::state::normal()
+);

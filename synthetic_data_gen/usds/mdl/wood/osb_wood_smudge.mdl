@@ -1,0 +1,23 @@
+// exported by: omni.mdl.usd_converter [1.0.24]
+// --/exts/omni.mdl.usd_converter/enableNewDemangling=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExports=True
+// --/exts/omni.mdl.usd_converter/allowRelativeExportUpwardLevels=-1
+
+mdl 1.8;
+
+import ::state::normal;
+import ::Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Wood::Laminate_Oak::Laminate_Oak_Slight_Smudges;
+
+export material Laminate_Oak_Slight_Smudges(*)
+ = Z82omniverse_3A_2F::localhost::NVIDIA::Materials::vMaterials_2::Wood::Laminate_Oak::Laminate_Oak_Slight_Smudges(
+    enable_infinite_tiling: false,
+    wood_brightness: 0.6999999881f,
+    wood_fiber_roughness: 1.f,
+    oak_bump_factor: 1.f,
+    smudges_weight: 0.8000000119f,
+    smudges_roughness: 0.75f,
+    dirt_weight: 0.5f,
+    texture_translate: float2(0.f),
+    texture_rotate: 0.f,
+    texture_scale: float2(1.f),
+    uv_space_index: 0);
