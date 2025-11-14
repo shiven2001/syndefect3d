@@ -1,0 +1,17 @@
+environments:
+  # List of background environments (list of folders or files)
+  folders: []
+  files:
+    - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_0/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_1/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_2/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_3/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_4/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_5/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_6/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_7/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_8/export_scene.blend/export_scene.usdc"
+    # - "file:///home/shiven/defect_detection/synthetic_data_gen/usds/smoke_test/aod_room_9/export_scene.blend/export_scene.usdc"
+
+info:
+  total_files: 10

@@ -687,12 +687,11 @@ def home_furniture_constraints():
             * defects_ceiling.related_to(r)
             .count()
             .in_range(0, 5)  # Ceiling defects: 0-5 per room
-            * defects_wall.related_to(r).all(
-                lambda t: (t.distance(r, cu.floortags) > 0.6)
-            )  # Wall defects: at least 0.6m above floor
+            # Removed height from floor constraint - defects can be at any height
             * defects.all(
                 lambda t: (
-                    (vertical_diff(t, r).abs() < 1.5) * (t.distance(cutters) > 0.1)
+                    (vertical_diff(t, r).abs() < 1.5)  # Keep vertical centering
+                    * (t.distance(cutters) > 0.05)  # 5cm clearance from doors/windows
                 )
             )
         )

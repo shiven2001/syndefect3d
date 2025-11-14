@@ -30,4 +30,4 @@ compose_indoors.solve_large_enabled = True   # Keep large fixtures (toilet, sink
 
 # Door settings - make ALL doors completely closed
 populate_doors.all_closed = True
-# populate_doors.door_chance = 0.0
+populate_doors.door_chance = 0.0
