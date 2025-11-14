@@ -9,7 +9,7 @@ PBR_TEXTURES_FOLDER = r"C:\Users\shive\OneDrive\Documents\GitHub\syndefect3d\def
 # Or use this on Windows:
 # PBR_TEXTURES_FOLDER = r"C:\Users\shive\OneDrive\Desktop\cuhk_research_tools\defect_detection_dataset\defect_generation\pbr_textures"
 
-FOLDER_SUFFIX = "20251114_094409"  # Set to None to process all folders, or specify like "20251109_165811"
+FOLDER_SUFFIX = "20251114_103900"  # Set to None to process all folders, or specify like "20251109_165811"
 OUTPUT_FOLDER = "glb_exports"  # Where to save GLB files (relative to script folder)
 PLANE_SCALE = (0.8, 0.6, 1.0)  # Scale for wall decoration
 SOLIDIFY_THICKNESS = 0.005  # 5mm - very thin
