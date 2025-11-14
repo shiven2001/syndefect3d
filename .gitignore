@@ -45,7 +45,7 @@ Blender-FLIP-Fluids
 *.npz
 *.out
 profiles_*.npz
-outputs
+#outputs
 outputs_scratch
 snippets
 resources

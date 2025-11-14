@@ -1,0 +1,2696 @@
+{
+    "objs": {
+        "301711_CeilingLightFactory": {
+            "active": true,
+            "dof_matrix_translation": [
+                [
+                    0.9999999999966757,
+                    -3.5578290744769665e-12,
+                    1.823266757115291e-06
+                ],
+                [
+                    -3.5578290744769665e-12,
+                    0.9999999999961923,
+                    1.951348622228305e-06
+                ],
+                [
+                    1.823266757115291e-06,
+                    1.951348622228305e-06,
+                    7.132072710192006e-12
+                ]
+            ],
+            "dof_rotation_axis": [
+                1.8232667571217927e-06,
+                1.9513486222352632e-06,
+                -0.999999999996434
+            ],
+            "generator": "CeilingLightFactory(1917642)",
+            "obj": "CeilingLightFactory(1917642).spawn_asset(4736814)",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": 0,
+                    "parent_plane_idx": 13,
+                    "relation": {
+                        "check_z": true,
+                        "child_tags": [
+                            "Subpart(top)",
+                            "-Subpart(bottom)",
+                            "-Subpart(front)",
+                            "-Subpart(back)"
+                        ],
+                        "margin": 0,
+                        "parent_tags": [
+                            "-Subpart(support)",
+                            "Subpart(ceiling)",
+                            "Subpart(visible)",
+                            "-Subpart(wall)"
+                        ],
+                        "relation_type": "StableAgainst",
+                        "rev_normal": false
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(no-rotation)",
+                "Semantics(object)",
+                "Semantics(single-generator)",
+                "Semantics(lighting)",
+                "FromGenerator(CeilingLightFactory)",
+                "Semantics(ceiling-light)",
+                "Semantics(no-children)",
+                "-Semantics(room)"
+            ]
+        },
+        "361621_CeilingLightFactory": {
+            "active": true,
+            "dof_matrix_translation": [
+                [
+                    0.9999823964345821,
+                    9.44490563987373e-06,
+                    0.004195612747396333
+                ],
+                [
+                    9.44490563987373e-06,
+                    0.9999949324900707,
+                    -0.0022510875245975465
+                ],
+                [
+                    0.004195612747396333,
+                    -0.0022510875245975465,
+                    2.2671075347258096e-05
+                ]
+            ],
+            "dof_rotation_axis": [
+                0.004195660307731379,
+                -0.002251113042318875,
+                -0.9999886643980784
+            ],
+            "generator": "CeilingLightFactory(1917642)",
+            "obj": "CeilingLightFactory(1917642).spawn_asset(2424337)",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": 0,
+                    "parent_plane_idx": 10,
+                    "relation": {
+                        "check_z": true,
+                        "child_tags": [
+                            "Subpart(top)",
+                            "-Subpart(bottom)",
+                            "-Subpart(front)",
+                            "-Subpart(back)"
+                        ],
+                        "margin": 0,
+                        "parent_tags": [
+                            "-Subpart(support)",
+                            "Subpart(ceiling)",
+                            "Subpart(visible)",
+                            "-Subpart(wall)"
+                        ],
+                        "relation_type": "StableAgainst",
+                        "rev_normal": false
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(no-rotation)",
+                "Semantics(object)",
+                "Semantics(single-generator)",
+                "Semantics(lighting)",
+                "FromGenerator(CeilingLightFactory)",
+                "Semantics(ceiling-light)",
+                "Semantics(no-children)",
+                "-Semantics(room)"
+            ]
+        },
+        "380515_StaticCategoryFactory": {
+            "active": true,
+            "dof_matrix_translation": [
+                [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            ],
+            "dof_rotation_axis": [
+                0.0,
+                1.0,
+                -0.0
+            ],
+            "generator": "StaticCategoryFactory(9102890)",
+            "obj": "StaticCategoryFactory(9102890).spawn_asset(3795299)",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": 0,
+                    "parent_plane_idx": 4,
+                    "relation": {
+                        "check_z": true,
+                        "child_tags": [
+                            "-Subpart(front)",
+                            "-Subpart(top)",
+                            "Subpart(back)"
+                        ],
+                        "margin": 0,
+                        "parent_tags": [
+                            "-Subpart(support)",
+                            "Subpart(visible)",
+                            "-Subpart(ceiling)",
+                            "Subpart(wall)"
+                        ],
+                        "relation_type": "StableAgainst",
+                        "rev_normal": false
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "FromGenerator(StaticCategoryFactory)",
+                "Semantics(object)",
+                "Semantics(defects)",
+                "-Semantics(room)"
+            ]
+        },
+        "560740_CeilingLightFactory": {
+            "active": true,
+            "dof_matrix_translation": [
+                [
+                    0.9999642700258113,
+                    5.981583123497304e-05,
+                    -0.005977049407850772
+                ],
+                [
+                    5.981583123497304e-05,
+                    0.9998998618457589,
+                    0.01000622549503708
+                ],
+                [
+                    -0.005977049407850772,
+                    0.01000622549503708,
+                    0.00013586812842969476
+                ]
+            ],
+            "dof_rotation_axis": [
+                -0.005977455494490203,
+                0.010006905327878905,
+                -0.9999320636281098
+            ],
+            "generator": "CeilingLightFactory(1917642)",
+            "obj": "CeilingLightFactory(1917642).spawn_asset(7804590)",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": 0,
+                    "parent_plane_idx": 23,
+                    "relation": {
+                        "check_z": true,
+                        "child_tags": [
+                            "Subpart(top)",
+                            "-Subpart(bottom)",
+                            "-Subpart(front)",
+                            "-Subpart(back)"
+                        ],
+                        "margin": 0,
+                        "parent_tags": [
+                            "-Subpart(support)",
+                            "Subpart(ceiling)",
+                            "Subpart(visible)",
+                            "-Subpart(wall)"
+                        ],
+                        "relation_type": "StableAgainst",
+                        "rev_normal": false
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(no-rotation)",
+                "Semantics(object)",
+                "Semantics(single-generator)",
+                "Semantics(lighting)",
+                "FromGenerator(CeilingLightFactory)",
+                "Semantics(ceiling-light)",
+                "Semantics(no-children)",
+                "-Semantics(room)"
+            ]
+        },
+        "691746_StaticCategoryFactory": {
+            "active": true,
+            "dof_matrix_translation": [
+                [
+                    1.4768310439228216e-05,
+                    -0.0038429275736353813,
+                    0.0
+                ],
+                [
+                    -0.0038429275736353813,
+                    0.9999852316895608,
+                    0.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            ],
+            "dof_rotation_axis": [
+                -0.9999926158175173,
+                -0.0038429559507233944,
+                0.0
+            ],
+            "generator": "StaticCategoryFactory(5276451)",
+            "obj": "StaticCategoryFactory(5276451).spawn_asset(50249)",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": 0,
+                    "parent_plane_idx": 6,
+                    "relation": {
+                        "check_z": true,
+                        "child_tags": [
+                            "-Subpart(front)",
+                            "-Subpart(top)",
+                            "Subpart(back)"
+                        ],
+                        "margin": 0,
+                        "parent_tags": [
+                            "-Subpart(support)",
+                            "Subpart(visible)",
+                            "-Subpart(ceiling)",
+                            "Subpart(wall)"
+                        ],
+                        "relation_type": "StableAgainst",
+                        "rev_normal": false
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "FromGenerator(StaticCategoryFactory)",
+                "Semantics(object)",
+                "Semantics(defects)",
+                "-Semantics(room)"
+            ]
+        },
+        "777877_StaticCategoryFactory": {
+            "active": true,
+            "dof_matrix_translation": [
+                [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            ],
+            "dof_rotation_axis": [
+                0.0,
+                1.0,
+                -0.0
+            ],
+            "generator": "StaticCategoryFactory(7707227)",
+            "obj": "StaticCategoryFactory(7707227).spawn_asset(2460796)",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": 0,
+                    "parent_plane_idx": 0,
+                    "relation": {
+                        "check_z": true,
+                        "child_tags": [
+                            "-Subpart(front)",
+                            "-Subpart(top)",
+                            "Subpart(back)"
+                        ],
+                        "margin": 0,
+                        "parent_tags": [
+                            "-Subpart(support)",
+                            "Subpart(visible)",
+                            "-Subpart(ceiling)",
+                            "Subpart(wall)"
+                        ],
+                        "relation_type": "StableAgainst",
+                        "rev_normal": false
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "FromGenerator(StaticCategoryFactory)",
+                "Semantics(object)",
+                "Semantics(defects)",
+                "-Semantics(room)"
+            ]
+        },
+        "bathroom_0/0": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "bathroom_0/0.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "SpecificObject(name='bathroom_0/0')",
+                "Semantics(room)",
+                "Semantics(bathroom)"
+            ]
+        },
+        "bathroom_0/1": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "bathroom_0/1.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(room)",
+                "SpecificObject(name='bathroom_0/1')",
+                "Semantics(bathroom)"
+            ]
+        },
+        "bathroom_0/2": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "bathroom_0/2.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(room)",
+                "SpecificObject(name='bathroom_0/2')",
+                "Semantics(bathroom)"
+            ]
+        },
+        "bedroom_0/0": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "bedroom_0/0.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(room)",
+                "SpecificObject(name='bedroom_0/0')",
+                "Semantics(bedroom)"
+            ]
+        },
+        "bedroom_0/1": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "bedroom_0/1.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "SpecificObject(name='bedroom_0/1')",
+                "Semantics(room)",
+                "Semantics(bedroom)"
+            ]
+        },
+        "closet_0/0": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "closet_0/0.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(room)",
+                "Semantics(closet)",
+                "SpecificObject(name='closet_0/0')"
+            ]
+        },
+        "dining-room_0/0": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "dining-room_0/0.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "SpecificObject(name='dining-room_0/0')",
+                "Semantics(room)",
+                "Semantics(dining-room)"
+            ]
+        },
+        "door": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "door",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "door.001": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "door.001",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "door.002": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "door.002",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "door.003": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "door.003",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "door.004": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "door.004",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "door.005": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "door.005",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "door.006": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "door.006",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "door.007": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "door.007",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "door.008": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "door.008",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "entrance": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "entrance",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(door)",
+                "Semantics(cutter)"
+            ]
+        },
+        "hallway_0/0": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "hallway_0/0.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(hallway)",
+                "Semantics(room)",
+                "SpecificObject(name='hallway_0/0')"
+            ]
+        },
+        "kitchen_0/0": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "kitchen_0/0.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(room)",
+                "Semantics(kitchen)",
+                "SpecificObject(name='kitchen_0/0')"
+            ]
+        },
+        "living-room_0/0": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "living-room_0/0.meshed",
+            "polygon": "<not-serialized>",
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "dining-room_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "kitchen_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Door"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "hallway_0/0",
+                    "value": null
+                },
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "connector_types": [
+                            "Wall"
+                        ],
+                        "relation_type": "RoomNeighbour"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(living-room)",
+                "Semantics(room)",
+                "SpecificObject(name='living-room_0/0')"
+            ]
+        },
+        "window": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.001": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.001",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.002": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.002",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "living-room_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.003": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.003",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.004": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.004",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.005": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.005",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.006": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.006",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.007": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.007",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.008": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.008",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.009": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.009",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.010": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.010",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.011": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.011",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.012": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.012",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.013": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.013",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.014": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.014",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.015": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.015",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.016": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.016",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.017": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.017",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.018": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.018",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.019": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.019",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.020": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.020",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.021": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.021",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bedroom_0/1",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.022": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.022",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.023": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.023",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.024": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.024",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.025": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.025",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/1",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.026": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.026",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.027": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.027",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.028": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.028",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.029": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.029",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "bathroom_0/2",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.030": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.030",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.031": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.031",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.032": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.032",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        },
+        "window.033": {
+            "active": true,
+            "dof_matrix_translation": null,
+            "dof_rotation_axis": null,
+            "generator": null,
+            "obj": "window.033",
+            "polygon": null,
+            "relations": [
+                {
+                    "child_plane_idx": null,
+                    "parent_plane_idx": null,
+                    "relation": {
+                        "relation_type": "CutFrom"
+                    },
+                    "target_name": "closet_0/0",
+                    "value": null
+                }
+            ],
+            "tags": [
+                "Semantics(window)",
+                "Semantics(cutter)"
+            ]
+        }
+    }
+}
