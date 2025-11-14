@@ -1,19 +1,30 @@
-import os
-import shutil
-import re
-from pathlib import Path
-from datetime import datetime
-from collections import defaultdict
+from __future__ import annotations
 
-# Configuration
-SOURCE_FOLDER = r"C:\Users\shive\OneDrive\Desktop\cuhk_research_tools\defect_detection_dataset\defect_generation\pbr_textures"
-OUTPUT_BASE_FOLDER = SOURCE_FOLDER  # Organize in the same folder
-DRY_RUN = False  # Set to True to preview without moving files
+import argparse
+import re
+import shutil
+from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Iterable, List, Sequence
 
 # Common PBR texture prefixes
-TEXTURE_TYPES = ['height', 'mask', 'normal', 'opacity', 'rough', 'upscale', 'displacement', 'basecolor', 'albedo', 'metallic', 'ao']
+TEXTURE_TYPES = [
+    'height',
+    'mask',
+    'normal',
+    'opacity',
+    'rough',
+    'upscale',
+    'displacement',
+    'basecolor',
+    'albedo',
+    'metallic',
+    'ao',
+]
+IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.tiff', '.tif', '.exr']
 
-def extract_base_number(filename):
+def extract_base_number(filename: str) -> str | None:
     """
     Extract the base number from filenames like 'opacity_00001_.png'
     Returns: base number string (e.g., '00001') or None
@@ -25,7 +36,7 @@ def extract_base_number(filename):
         return match.group(1)
     return None
 
-def get_texture_type(filename):
+def get_texture_type(filename: str) -> str:
     """
     Extract texture type from filename (e.g., 'opacity', 'rough', 'normal')
     """
@@ -34,27 +45,33 @@ def get_texture_type(filename):
             return tex_type
     return 'unknown'
 
-def generate_unique_id():
+def generate_unique_id() -> str:
     """
     Generate a unique identifier based on timestamp
     """
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-def organize_textures(source_folder, dry_run=False):
+def organize_textures(
+    source_folder: Path,
+    output_base_folder: Path | None = None,
+    dry_run: bool = False,
+    recursive: bool = True,
+) -> None:
     """
     Organize texture files into folders by their base number
     """
-    source_path = Path(source_folder)
+    source_path = Path(source_folder).expanduser().resolve()
+    output_base = (
+        Path(output_base_folder).expanduser().resolve()
+        if output_base_folder
+        else source_path
+    )
     
     if not source_path.exists():
         print(f"✗ Source folder does not exist: {source_folder}")
         return
     
-    # Find all image files
-    image_extensions = ['.png', '.jpg', '.jpeg', '.tiff', '.tif', '.exr']
-    all_files = []
-    for ext in image_extensions:
-        all_files.extend(source_path.glob(f"*{ext}"))
+    all_files = list(_find_image_files(source_path, recursive))
     
     # Group files by base number
     texture_groups = defaultdict(list)
@@ -106,9 +123,8 @@ def organize_textures(source_folder, dry_run=False):
     for base_num in sorted(texture_groups.keys()):
         files = texture_groups[base_num]
         
-        # Create folder name with unique ID
         folder_name = f"texture_{base_num}_{unique_id}"
-        folder_path = source_path / folder_name
+        folder_path = output_base / folder_name
         
         try:
             # Create folder
@@ -145,7 +161,7 @@ def organize_textures(source_folder, dry_run=False):
     print("="*70)
     
     # Create a manifest file
-    manifest_path = source_path / f"organization_manifest_{unique_id}.txt"
+    manifest_path = output_base / f"organization_manifest_{unique_id}.txt"
     with open(manifest_path, 'w') as f:
         f.write(f"Texture Organization Manifest\n")
         f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -164,6 +180,49 @@ def organize_textures(source_folder, dry_run=False):
     
     print(f"\n📄 Manifest saved: {manifest_path.name}")
 
+def _find_image_files(folder: Path, recursive: bool) -> Iterable[Path]:
+    pattern = "**/*" if recursive else "*"
+    for path in folder.glob(pattern):
+        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS:
+            yield path
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Group PBR texture maps into numbered folders."
+    )
+    default_source = Path(__file__).resolve().parent
+
+    parser.add_argument(
+        "--source",
+        type=Path,
+        default=default_source,
+        help="Folder that contains the textures (default: folder containing this script)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Folder to place organized sets (default: same as source)",
+    )
+    parser.add_argument(
+        "--no-recursive",
+        action="store_true",
+        help="Only look at files directly inside --source (skip subfolders).",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview organization without moving files.",
+    )
+    return parser.parse_args(argv)
+
+
 if __name__ == "__main__":
-    # Set DRY_RUN = True to preview first
-    organize_textures(SOURCE_FOLDER, dry_run=DRY_RUN)
+    args = parse_args()
+    organize_textures(
+        source_folder=args.source,
+        output_base_folder=args.output,
+        dry_run=args.dry_run,
+        recursive=not args.no_recursive,
+    )

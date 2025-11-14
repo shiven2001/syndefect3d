@@ -21,25 +21,25 @@ coverage.xml
 
 slurm-*.out
 __pycache__
-*.blend
-*.blend1
-*.obj
-*.mtl
-*.DS_Store
-**._.DS_Store
-**.swp
+#*.blend
+#*.blend1
+#*.obj
+#*.mtl
+#*.DS_Store
+#**._.DS_Store
+#**.swp
 
 .idea
-Blender.app/
-blender.dmg
-screenlog.*
+#Blender.app/
+#blender.dmg
+#screenlog.*
 
 dev_install.sh
 
 dev.py
 
 cache
-Blender-FLIP-Fluids
+#Blender-FLIP-Fluids
 *.mp4
 
 *.npz
@@ -60,22 +60,22 @@ _start.txt
 config/custom.gin
 *.so
 *pyx.cpp
-blends
+#blends
 generated_surface_script.py
 build
 *egg-info
 dist
 build
-blends
+#blends
 *.ipynb_checkpoints
 
 process_mesh
 worldgen
 
-*.xml
-*.usd
-*.usda
-*.usdc
+#*.xml
+#*.usd
+#*.usda
+#*.usdc
 
 tests/sim/sim_exports
 tests/sim/test_blueprints
