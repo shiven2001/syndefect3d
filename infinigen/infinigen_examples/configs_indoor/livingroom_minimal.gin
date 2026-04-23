@@ -1,0 +1,48 @@
+# Minimal Living Room Configuration
+# Spawns: Ceiling Lights ONLY
+# NO sofas, NO coffee table, NO storage, NO other furniture
+
+# Use single room configuration
+BlueprintSolidifier.enable_open=False
+
+# Restrict to living room type
+restrict_solving.solve_max_rooms=1
+restrict_solving.restrict_parent_rooms=["LivingRoom"]
+
+# Filter to only ceiling light, defect, AC, and wall plug constraints
+# Keeps: ceiling_lights, defects, ac_units, wall_plugs
+# Removes: sofa, sofa_positioning, tv, livingroom_objects
+restrict_solving.consgraph_filters=["ceiling_lights", "cracks", "paint_peel", "spalling", "spalling_plug", "wall_bubbles", "weak_leak_stain", "open_wiring", "ac_units", "wall_plugs"]
+
+# Disable terrain and other features
+compose_indoors.terrain_enabled = False
+compose_indoors.hide_other_rooms_enabled = True
+
+# Disable object solving stages (no items, no sofas)
+compose_indoors.solve_small_enabled = False   # No small items
+compose_indoors.solve_medium_enabled = True   # Enable for defect planes (ceiling lights handled separately)
+compose_indoors.solve_large_enabled = False  
+
+# Extras
+compose_indoors.lights_off_chance = 0.0
+compose_indoors.skirting_floor_chance = 0.5
+compose_indoors.skirting_ceiling_chance = 0.5
+
+# Door settings - make ALL doors completely closed
+# populate_doors.all_closed = True
+populate_doors.door_chance = 1.0
+
+# Fast solve
+# FloorPlanSolver.n_divide_trials = 25
+# FloorPlanSolver.iters_mult = 25
+# home_room_constraints.has_fewer_rooms = True
+# solve_objects.addition_weight_scalar = 3.0
+# compose_indoors.solve_steps_large = 100
+# compose_indoors.solve_steps_medium = 40
+# compose_indoors.solve_steps_small = 5
+
+
+# Match camera sensor to 1024x1024 renders
+execute_tasks.generate_resolution = (1024, 1024)
+get_sensor_coords.H = 1024
+get_sensor_coords.W = 1024

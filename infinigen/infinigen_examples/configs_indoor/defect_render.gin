@@ -1,0 +1,23 @@
+render.render_image_func = @defect/render_image
+
+# Reuse full-quality sampling defaults (can be tuned)
+configure_render_cycles.time_limit = 0
+configure_render_cycles.min_samples = 512
+configure_render_cycles.num_samples = 1024
+configure_render_cycles.adaptive_threshold = 0.005
+configure_render_cycles.denoise = True
+
+# Bump-only: no true displacement (avoids mesh warping from shader displacement at render)
+set_displacement_mode.displacement_mode = "BUMP"
+
+defect/render_image.flat_shading = False
+defect/render_image.passes_to_save = [
+    ['material_index', 'IndexMA'],
+]
+
+# Override resolution for defect renders
+execute_tasks.generate_resolution = (1024, 1024)
+get_sensor_coords.H = 1024
+get_sensor_coords.W = 1024
+
+

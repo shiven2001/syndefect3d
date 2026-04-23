@@ -1,0 +1,54 @@
+# Minimal Bathroom Configuration
+# Spawns: Toilet, Bathtub (required), and Sink
+# NO secondary objects (no bottles, towels, etc.)
+# NO storage (no shelves)
+
+# Use single room configuration
+BlueprintSolidifier.enable_open=False
+
+# Restrict to bathroom room type
+restrict_solving.solve_max_rooms=1
+restrict_solving.restrict_parent_rooms=["Bathroom"]
+
+# Don't restrict primary/secondary children - let the constraint graph do it
+# The bathroom constraint requires: Mirror, Sink, Toilet
+# We'll use consgraph_filters to keep only bathroom fixtures
+
+# Filter constraint graph to ONLY bathroom fixture constraints
+# Keeps: bathroom (toilet+sink+mirror), toilet, bathtub, defects, ceiling_lights, wall_plugs, faucets
+# Removes: storage-related constraints
+# Note: AC units are excluded for bathrooms (not in filters)
+restrict_solving.consgraph_filters=["bathroom", "toilet", "bathtub", "cracks", "paint_peel", "spalling", "spalling_plug", "wall_bubbles", "weak_leak_stain", "open_wiring", "ceiling_lights", "wall_plugs", "faucets"]
+
+# Disable terrain and other features
+compose_indoors.terrain_enabled = False
+compose_indoors.hide_other_rooms_enabled = True
+
+# Disable solving stages we don't need
+compose_indoors.solve_small_enabled = False  # No bathroom items (bottles, towels)
+compose_indoors.solve_medium_enabled = True  # Enable for defect planes
+compose_indoors.solve_large_enabled = True   # Keep large fixtures (toilet, sink, bathtub)
+
+# Extras
+compose_indoors.lights_off_chance = 0.0
+compose_indoors.skirting_floor_chance = 0.5
+compose_indoors.skirting_ceiling_chance = 0.5
+
+# Door settings - make ALL doors completely closed
+# populate_doors.all_closed = True
+populate_doors.door_chance = 1.0
+
+# Fast solve
+# FloorPlanSolver.n_divide_trials = 25
+# FloorPlanSolver.iters_mult = 25
+# home_room_constraints.has_fewer_rooms = True
+# solve_objects.addition_weight_scalar = 3.0
+# compose_indoors.solve_steps_large = 100
+# compose_indoors.solve_steps_medium = 40
+# compose_indoors.solve_steps_small = 5
+
+
+# Match camera sensor to 1024x1024 renders
+execute_tasks.generate_resolution = (1024, 1024)
+get_sensor_coords.H = 1024
+get_sensor_coords.W = 1024
