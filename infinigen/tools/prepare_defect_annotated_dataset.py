@@ -16,7 +16,7 @@ Maps defect materials to classes:
   - 0: background (non-defect)
   - 1: CrackMaterial_*
   - 2: PaintPeelMaterial_*
-  - 3: SpallingMaterial_*
+  - 3: SpallingMaterial_* and SpallingPlugMaterial_* (same class as spalling)
   - 4: BubbleMaterial_*
   - 5: OpenWiringMaterial_*
 
@@ -55,6 +55,8 @@ CLASS_EXPOSED_WIRING = 5
 DEFECT_PREFIXES = {
     "CrackMaterial": CLASS_CRACK,
     "PaintPeelMaterial": CLASS_PAINT_PEEL,
+    # Spalling plug planes use a distinct material name; count as spalling everywhere.
+    "SpallingPlugMaterial": CLASS_SPALLING,
     "SpallingMaterial": CLASS_SPALLING,
     "BubbleMaterial": CLASS_PAINT_BUBBLE,
     "OpenWiringMaterial": CLASS_EXPOSED_WIRING,
@@ -523,7 +525,7 @@ def main():
         "0 background\n"
         "1 crack (CrackMaterial_*)\n"
         "2 paint_peel (PaintPeelMaterial_*)\n"
-        "3 spalling (SpallingMaterial_*)\n"
+        "3 spalling (SpallingMaterial_*, SpallingPlugMaterial_*)\n"
         "4 paint_bubble (BubbleMaterial_*)\n"
         "5 exposed_wiring (OpenWiringMaterial_*)\n"
         f"# Mask PNG: gray level = class_id * {MASK_GRAY_STEP} (class 0..{NUM_CLASSES - 1})\n"
