@@ -29,7 +29,8 @@ Outputs:
                               {x_min,y_min,x_max,y_max}; fields pass_index, material_name)
   - out_dir/bboxes_yolo/<id>.txt (YOLO-format: class_id xc_n yc_n w_n h_n, all in [0,1])
   - out_dir/splits/train.txt, val.txt, test.txt (~70% / 15% / 15%, reproducible with --seed)
-  - Existing image+mask pairs are skipped on re-run; splits are always refreshed from disk.
+  - Existing samples are skipped when images/, masks/, bboxes/, and bboxes_yolo/ files already
+    exist; use --force to regenerate after changing defect classes or bbox logic.
 """
 
 from __future__ import annotations
@@ -389,6 +390,31 @@ def split_train_val_test(
     return train_ids, val_ids, test_ids
 
 
+def write_class_names_legend(output_dir: Path) -> Path:
+    """Write ``class_names.txt`` (short semantic names + decode hints). Shared by full export and single-sample."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    legend_path = output_dir / "class_names.txt"
+    half = MASK_GRAY_STEP // 2
+    legend_path.write_text(
+        "0 background\n"
+        "1 crack\n"
+        "2 paint_peel\n"
+        "3 spalling\n"
+        "4 paint_bubble\n"
+        "5 exposed_wiring\n"
+        f"# Mask PNG: gray level = class_id * {MASK_GRAY_STEP} (class 0..{NUM_CLASSES - 1})\n"
+        f"# Decode: label = ((mask + {half}) // {MASK_GRAY_STEP}).clip(0, {NUM_CLASSES - 1})\n"
+        "# Legacy 4-class masks only use {0,85,170,255}: label = (mask // 85).clip(0,3)\n"
+        "# 2D bboxes: per-image JSON — one box per defect material pass_index (placed asset);\n"
+        "#   boxes[{class_id, class_name, pass_index, material_name, x_min, y_min, x_max,\n"
+        "#   y_max, width, height, area}] (pixel coords, inclusive).\n"
+        "# YOLO labels: bboxes_yolo/<id>.txt lines '<cls> <xc_n> <yc_n> <w_n> <h_n>', defects 1..5\n"
+        "# are remapped to YOLO class ids 0..4 (background is not an object class).\n"
+    )
+    return legend_path
+
+
 DEFAULT_INPUT_FOLDER = Path("/mnt/nvme_storage/dataset/all_frames")
 DEFAULT_OUTPUT_FOLDER = Path("/mnt/nvme_storage/dataset/defect_segmentation_dataset")
 
@@ -427,7 +453,10 @@ def main():
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Re-write images and masks even if they already exist.",
+        help=(
+            "Re-write outputs even when images/, masks/, bboxes/, and bboxes_yolo/ already exist "
+            "(needed after changing DEFECT_PREFIXES or bbox rules; otherwise skipped samples stay stale)."
+        ),
     )
     parser.add_argument(
         "--splits-only",
@@ -499,6 +528,11 @@ def main():
                 f"Wrote {success} new/updated samples, skipped {skipped} already present "
                 f"(of {len(samples)} from input) -> {output_dir}"
             )
+            if skipped > 0 and not args.force:
+                print(
+                    "Hint: skipped rows kept old mask/bbox/YOLO files. "
+                    "Use --force to regenerate everything (e.g. after adding SpallingPlugMaterial)."
+                )
     else:
         print("--splits-only: skipping input processing.")
 
@@ -518,26 +552,8 @@ def main():
         f"-> {splits_dir}"
     )
 
-    # Class legend for training
-    legend = output_dir / "class_names.txt"
-    half = MASK_GRAY_STEP // 2
-    legend.write_text(
-        "0 background\n"
-        "1 crack (CrackMaterial_*)\n"
-        "2 paint_peel (PaintPeelMaterial_*)\n"
-        "3 spalling (SpallingMaterial_*, SpallingPlugMaterial_*)\n"
-        "4 paint_bubble (BubbleMaterial_*)\n"
-        "5 exposed_wiring (OpenWiringMaterial_*)\n"
-        f"# Mask PNG: gray level = class_id * {MASK_GRAY_STEP} (class 0..{NUM_CLASSES - 1})\n"
-        f"# Decode: label = ((mask + {half}) // {MASK_GRAY_STEP}).clip(0, {NUM_CLASSES - 1})\n"
-        "# Legacy 4-class masks only use {0,85,170,255}: label = (mask // 85).clip(0,3)\n"
-        "# 2D bboxes: per-image JSON — one box per defect material pass_index (placed asset);\n"
-        "#   boxes[{class_id, class_name, pass_index, material_name, x_min, y_min, x_max,\n"
-        "#   y_max, width, height, area}] (pixel coords, inclusive).\n"
-        "# YOLO labels: bboxes_yolo/<id>.txt lines '<cls> <xc_n> <yc_n> <w_n> <h_n>', defects 1..5\n"
-        "# are remapped to YOLO class ids 0..4 (background is not an object class).\n"
-    )
-    print(f"Class legend: {legend}")
+    legend_path = write_class_names_legend(output_dir)
+    print(f"Class legend: {legend_path}")
 
     write_coco_aggregate(output_dir, out_bboxes, ids)
 
