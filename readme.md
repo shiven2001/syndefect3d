@@ -1,6 +1,6 @@
 ## SynDefect3D
 
-Procedurally generated photorealistic 3D synthetic dataset for indoor building defect inspection, built on [Infinigen Indoors](https://arxiv.org/abs/2406.11824). This repository extends the Infinigen pipeline with defect-focused rendering and export workflows for RGB, material segmentation, and simulation use (e.g. NVIDIA Omniverse / Isaac Sim).
+Procedurally generated photorealistic 3D synthetic dataset for indoor building defect inspection, built on [Infinigen Indoors](https://arxiv.org/abs/2406.11824). This repository extends the Infinigen pipeline with defect-focused rendering and export workflows for RGB, material segmentation, YOLO-style detection labels, and simulation use (e.g. NVIDIA Omniverse / Isaac Sim).
 
 ### Paper
 
@@ -33,30 +33,42 @@ _Add dataset name, download link, and a short description of splits and annotati
 
 ### Acknowledgements
 
-This work builds on **[Infinigen](https://infinigen.org)** ([code](https://github.com/princeton-vl/infinigen), [documentation](https://github.com/princeton-vl/infinigen/tree/main/docs)). Please see the Infinigen repository for installation, dependencies, and full citation list.
+This work builds on **[Infinigen](https://infinigen.org)** ([code](https://github.com/princeton-vl/infinigen), [documentation](https://github.com/princeton-vl/infinigen/tree/main/docs)). Please see the Infinigen repository for installation, dependencies, and the full citation list.
 
-Additional open-source assets were used in this generator. These are:
+Additional open-source assets used in this generator:
 
-(ADD)
-\begin{enumerate}[-]
-    \item Air Conditioner by Daniyal Malik (\href{https://skfb.ly/o6G6o}{Source}).
-    \item Air condition Daikin by maxsbond.work (\href{https://skfb.ly/6R7V7}{Source}).
-    \item Indoor air conditioner unit by Rylae Shylna (\href{https://skfb.ly/6S8W8}{Source}).
-    \item UK wall plug socket by Geng4d (\href{https://skfb.ly/6T9X9}{Source}).
-    \item UK Plug Socket by Tenakin (\href{https://skfb.ly/6UANY}{Source}).
-    \item Twin Plug Socket by Sousinho (\href{https://skfb.ly/6VBOZ}{Source}).
-    \item Wall Power Outlet - Type I by cdcruz (\href{https://skfb.ly/6WCP1}{Source}).
-    \item Grohe G-31191001 and Grohe G-32667001 by trendforward (\href{https://skfb.ly/6XDQ2}{Source}).
-    \item Modern Faucet (high poly) by Elasta Kristya (\href{https://skfb.ly/6YER3}{Source}).
-    \item Roca Element Bidet Mixer by Toss90 (\href{https://skfb.ly/6ZFS4}{Source}).
-\end{enumerate}
+- Air Conditioner by Daniyal Malik — [Sketchfab](https://skfb.ly/o6G6o)
+- Air condition Daikin by maxsbond.work — [Sketchfab](https://skfb.ly/6R7V7)
+- Indoor air conditioner unit by Rylae Shylna — [Sketchfab](https://skfb.ly/6S8W8)
+- UK wall plug socket by Geng4d — [Sketchfab](https://skfb.ly/6T9X9)
+- UK Plug Socket by Tenakin — [Sketchfab](https://skfb.ly/6UANY)
+- Twin Plug Socket by Sousinho — [Sketchfab](https://skfb.ly/6VBOZ)
+- Wall Power Outlet - Type I by cdcruz — [Sketchfab](https://skfb.ly/6WCP1)
+- Grohe G-31191001 and Grohe G-32667001 by trendforward — [Sketchfab](https://skfb.ly/6XDQ2)
+- Modern Faucet (high poly) by Elasta Kristya — [Sketchfab](https://skfb.ly/6YER3)
+- Roca Element Bidet Mixer by Toss90 — [Sketchfab](https://skfb.ly/6ZFS4)
+
 ---
 
 ### Usage
 
 Generation is driven by [Gin](https://github.com/google/gin-config) configs. See **`infinigen/infinigen_examples/configs_indoor/`** for available scenes and render settings.
 
-Run the commands below from the **`infinigen/`** directory (or ensure that directory is on `PYTHONPATH`), after completing Infinigen’s [installation](https://github.com/princeton-vl/infinigen/blob/main/docs/Installation.md).
+Run the commands below from the **`infinigen/`** directory (or put that directory on `PYTHONPATH`), after completing Infinigen’s [installation](https://github.com/princeton-vl/infinigen/blob/main/docs/Installation.md).
+
+#### Defect-focus cameras and YOLO / bbox exports
+
+**Defect-focus cameras** are controlled by Gin, not by the render loop itself:
+
+- **`camera.add_defect_focus.enabled`** (see [`infinigen_examples/configs_indoor/base_indoors.gin`](infinigen/infinigen_examples/configs_indoor/base_indoors.gin)) defaults to **`False`**. Then you only have the usual **`n_camera_rigs`** from coarse generation, all posed with the normal indoor camera logic.
+- Set it to **`True`** when running **coarse** (same Gin mechanism as other overrides), e.g.  
+  `-p camera.add_defect_focus.enabled=True`  
+  to add **extra** camera rigs—**one additional rig per defect**—with head-on views. Your render loop should still use **`tools/count_camera_rigs.py`** so rig indices stay correct as the rig count grows.
+
+**YOLO labels and bbox JSON** are **not** produced inside Blender during **`--task render`**. The render writes RGB + material segmentation (`MaterialSegmentation/`, `Materials/`).
+
+- **Enable** the packaged detection + segmentation dataset: run **`tools/prepare_defect_annotated_dataset.py`** (§3). That script always emits **`images/`**, **`masks/`**, **`bboxes/`**, and **`bboxes_yolo/`** together (there is no Gin flag to turn YOLO off inside the preparer).
+- **Skip detection exports**: if you only need raw frames and material-index maps, **do not run** §3. If you ran the preparer but train **segmentation only**, use **`masks/`** (and **`images/`**) and ignore or remove **`bboxes/`** and **`bboxes_yolo/`**.
 
 #### 1. Coarse scene generation (example: 10 bedrooms)
 
@@ -74,12 +86,14 @@ for i in $(seq -w 1 10); do
 done
 ```
 
-- **`--overrides camera.spawn_camera_rigs.n_camera_rigs=10`** increases the number of camera rigs in the scene.
-- **`-g bedroom_minimal.gin`** uses a minimal room: structural geometry only, without extra furniture. The paper uses five analogous configs: **`bedroom_minimal`**, **`kitchen_minimal`**, **`dining_minimal`**, **`bathroom_minimal`**, and **`livingroom_minimal`**. You can edit these, combine with other `.gin` files in that folder, or add your own.
+- **`--overrides camera.spawn_camera_rigs.n_camera_rigs=10`** sets how many camera rigs are stored in the blend.
+- **`bedroom_minimal.gin`** (and analogous **`kitchen_minimal`**, **`dining_minimal`**, **`bathroom_minimal`**, **`livingroom_minimal`**) reduce clutter while keeping defect-related constraints; edit or combine `.gin` files as needed.
 
 #### 2. Rendering (defect pipeline)
 
-Because coarse generation used 10 camera rigs, render once per rig. **`defect_render.gin`** controls the render setup; **`execute_tasks.resample_idx`** runs multiple resamples per camera for domain randomization (5 resamples in this example).
+**`defect_render.gin`** enables material-index passes; **`execute_tasks.resample_idx`** randomizes the scene per resample. The loop below counts rigs per blend with **`tools/count_camera_rigs.py`** so you do not hard-code rig indices.
+
+Set output roots with **`=`** (not `:`). Example:
 
 ```bash
 OUT_ROOT="${OUT_ROOT:-$(pwd)/outputs/dataset}"
@@ -88,27 +102,68 @@ mkdir -p "${OUT_FRAMES_ROOT}"
 
 for room in bedroom; do
   for i in $(seq -w 1 10); do
-    [[ -d "${OUT_ROOT}/${room}${i}" ]] || continue
-    for rig in {0..9}; do
+    scene_dir="${OUT_ROOT}/${room}${i}"
+    [[ -d "${scene_dir}" ]] || continue
+    blend="${scene_dir}/scene.blend"
+    [[ -f "${blend}" ]] || continue
+    n_rigs="$(blender --background --quiet "${blend}" --python tools/count_camera_rigs.py 2>/dev/null | grep -E '^[0-9]+$' | head -n1)"
+    [[ "${n_rigs}" =~ ^[0-9]+$ ]] || { echo "skip ${scene_dir}: could not count camera rigs" >&2; continue; }
+    for rig in $(seq 0 $((n_rigs - 1))); do
       for rs in {0..4}; do
         python -m infinigen_examples.generate_indoors \
           --seed 0 \
           --task render \
-          --input_folder "${OUT_ROOT}/${room}${i}" \
+          --input_folder "${scene_dir}" \
           --output_folder "${OUT_FRAMES_ROOT}/${room}${i}/rig${rig}_rs${rs}" \
           -g infinigen_examples/configs_indoor/defect_render.gin \
           -p render.render_image_func=@defect/render_image \
-             execute_tasks.camera_id=[${rig},0] \
-             execute_tasks.resample_idx=${rs}
+             "execute_tasks.camera_id=[${rig},0]" \
+             "execute_tasks.resample_idx=${rs}"
       done
     done
   done
 done
 ```
 
-This produces RGB frames and full material segmentation. To convert them into RGB plus **pixel masks for defects only**, use the post-processing script _(to be added)_.
+Under each **`rig*_rs*`** folder you should see **`Image/`**, **`MaterialSegmentation/`**, and **`Materials/`** (after the compositor reorganizes outputs). Use the same layout for multiple room types by extending the `for room in ...` list (e.g. `bathroom kitchen`).
 
-#### 3. Export for Isaac Sim / Omniverse
+#### 3. Defect masks, COCO-style bboxes, and YOLO labels
+
+**`tools/prepare_defect_annotated_dataset.py`** walks an `all_frames`-style tree, writes a flat training pack:
+
+- **`images/`**, **`masks/`** (semantic defect classes)
+- **`bboxes/`** (per-image JSON, pixel boxes; spalling plugs share the **spalling** class with wall spalling)
+- **`bboxes_yolo/`** (YOLO detection lines: `cls xc yc w h` normalized; `cls` 0–4)
+- **`class_names.txt`**, **`splits/`**, **`annotations_coco.json`**
+
+```bash
+python tools/prepare_defect_annotated_dataset.py \
+  -i /path/to/all_frames \
+  -o /path/to/defect_annotated_dataset
+```
+
+After changing class rules or bbox logic, regenerate existing files with **`--force`**. The script skips samples when all of `images`, `masks`, `bboxes`, and `bboxes_yolo` already exist unless **`--force`** is set.
+
+**One frame only** (same logic as the full exporter):
+
+```bash
+python tools/prepare_defect_single_sample.py \
+  -i /path/to/all_frames \
+  --sample-id bathroom08_rig18_rs1_rig18_camera_0 \
+  -o /tmp/one_sample_export
+```
+
+**Quick visual check** of boxes on raw frames (uses the same bbox logic as the preparer):
+
+```bash
+python tools/visualize_defect_yolo_annotations.py \
+  -i /path/to/all_frames \
+  --sample-id bathroom08_rig18_rs1_rig18_camera_0 \
+  -o preview.png \
+  --print-yolo
+```
+
+#### 4. Export for Isaac Sim / Omniverse
 
 For training embodied AI in Isaac Sim, export scenes to USD:
 
