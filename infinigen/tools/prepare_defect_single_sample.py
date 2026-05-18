@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Export masks + bbox JSON + YOLO labels for **one** sample id, using the same logic as
+Export masks (and optionally bbox JSON + YOLO) for **one** sample id, using the same logic as
 prepare_defect_annotated_dataset.py (no full-dataset scan beyond discovery).
 
 Typical use after rendering under all_frames:
@@ -9,10 +9,11 @@ Typical use after rendering under all_frames:
     --sample-id bathroom08_rig18_rs1_rig18_camera_0 \\
     -o /tmp/bathroom08_one_sample
 
-Writes under -o:
-  images/<id>.png  masks/<id>.png  bboxes/<id>.json  bboxes_yolo/<id>.txt
-  class_names.txt (same file as full preparer: prepare_defect_annotated_dataset.write_class_names_legend)
-  annotations_coco.json (single image)
+Writes under -o (default: segmentation only):
+  images/<id>.png  masks/<id>.png  class_names.txt  splits/sample.txt
+
+With --with-bboxes also:
+  bboxes/<id>.json  bboxes_yolo/<id>.txt  annotations_coco.json
 """
 
 from __future__ import annotations
@@ -55,6 +56,11 @@ def main() -> int:
         action="store_true",
         help="Overwrite outputs if they already exist.",
     )
+    parser.add_argument(
+        "--with-bboxes",
+        action="store_true",
+        help="Also write bboxes/, bboxes_yolo/, and annotations_coco.json (same as full preparer).",
+    )
     args = parser.parse_args()
 
     input_root = args.input_folder.resolve()
@@ -95,9 +101,10 @@ def main() -> int:
     bbox_out = out_bboxes / f"{sid}.json"
     yolo_out = out_bboxes_yolo / f"{sid}.txt"
 
-    if not args.force and all(
-        p.is_file() for p in (img_out, mask_out, bbox_out, yolo_out)
-    ):
+    required = [img_out, mask_out]
+    if args.with_bboxes:
+        required.extend([bbox_out, yolo_out])
+    if not args.force and all(p.is_file() for p in required):
         print(
             f"Outputs already exist under {out}; use --force to overwrite.",
             file=sys.stderr,
@@ -113,12 +120,14 @@ def main() -> int:
         out_masks,
         out_bboxes,
         out_bboxes_yolo,
+        with_bboxes=args.with_bboxes,
     )
     if not ok:
         return 1
 
     prep.write_class_names_legend(out)
-    prep.write_coco_aggregate(out, out_bboxes, [sid])
+    if args.with_bboxes:
+        prep.write_coco_aggregate(out, out_bboxes, [sid])
     (out / "splits").mkdir(parents=True, exist_ok=True)
     (out / "splits" / "sample.txt").write_text(sid + "\n")
 
@@ -126,7 +135,10 @@ def main() -> int:
     print(f"  RGB:   {img_path}")
     print(f"  Seg:   {npy_path}")
     print(f"  Mat:   {json_path}")
-    print(f"  Wrote: {img_out.name}, {mask_out.name}, {bbox_out.name}, {yolo_out.name}")
+    wrote = [img_out.name, mask_out.name]
+    if args.with_bboxes:
+        wrote.extend([bbox_out.name, yolo_out.name])
+    print(f"  Wrote: {', '.join(wrote)}")
     return 0
 
 

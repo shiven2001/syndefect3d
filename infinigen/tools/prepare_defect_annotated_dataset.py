@@ -20,17 +20,22 @@ Maps defect materials to classes:
   - 4: BubbleMaterial_*
   - 5: OpenWiringMaterial_*
 
-Outputs:
+Outputs (default: segmentation pack only):
   - out_dir/images/<id>.png  (RGB)
   - out_dir/masks/<id>.png   (single-channel uint8: class k -> k * MASK_GRAY_STEP, max <= 180;
                               visible in viewers; distinct from legacy 0,85,170,255)
+  - out_dir/splits/train.txt, val.txt, test.txt (~70% / 15% / 15%, reproducible with --seed)
+  - out_dir/class_names.txt
+
+With ``--with-bboxes`` additionally:
   - out_dir/bboxes/<id>.json (one 2D bbox per defect *material pass* / placed asset plane:
                               union of all pixels with that Blender pass_index; pixel coords
                               {x_min,y_min,x_max,y_max}; fields pass_index, material_name)
   - out_dir/bboxes_yolo/<id>.txt (YOLO-format: class_id xc_n yc_n w_n h_n, all in [0,1])
-  - out_dir/splits/train.txt, val.txt, test.txt (~70% / 15% / 15%, reproducible with --seed)
-  - Existing samples are skipped when images/, masks/, bboxes/, and bboxes_yolo/ files already
-    exist; use --force to regenerate after changing defect classes or bbox logic.
+  - out_dir/annotations_coco.json (aggregate COCO)
+
+  Existing samples are skipped when images/ and masks/ already exist (and when using
+  ``--with-bboxes``, bboxes/ and bboxes_yolo/ as well); use --force to regenerate.
 """
 
 from __future__ import annotations
@@ -311,8 +316,9 @@ def process_sample(
     out_masks: Path,
     out_bboxes: Path,
     out_bboxes_yolo: Path,
+    with_bboxes: bool = False,
 ) -> bool:
-    """Load RGB + material data, build label map, save image, mask, and bboxes."""
+    """Load RGB + material data, build label map, save image, mask, and optionally bboxes."""
     try:
         rgb = imread(image_path)
         if rgb.ndim == 2:
@@ -347,11 +353,12 @@ def process_sample(
             str(out_masks / f"{sample_id}.png")
         )
 
-        h, w = label.shape[:2]
-        boxes = compute_asset_bboxes_from_material_passes(
-            index_map, materials, min_area=BBOX_MIN_PIXEL_AREA
-        )
-        write_bboxes(sample_id, boxes, h, w, out_bboxes, out_bboxes_yolo)
+        if with_bboxes:
+            h, w = label.shape[:2]
+            boxes = compute_asset_bboxes_from_material_passes(
+                index_map, materials, min_area=BBOX_MIN_PIXEL_AREA
+            )
+            write_bboxes(sample_id, boxes, h, w, out_bboxes, out_bboxes_yolo)
 
         return True
     except Exception as e:
@@ -451,10 +458,18 @@ def main():
         help="Random seed for train/val/test split (default: 42).",
     )
     parser.add_argument(
+        "--with-bboxes",
+        action="store_true",
+        help=(
+            "Also write bboxes/, bboxes_yolo/, and annotations_coco.json (detection sidecar). "
+            "Default is images/ + masks/ + splits/ + class_names.txt only."
+        ),
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help=(
-            "Re-write outputs even when images/, masks/, bboxes/, and bboxes_yolo/ already exist "
+            "Re-write outputs even when target files already exist "
             "(needed after changing DEFECT_PREFIXES or bbox rules; otherwise skipped samples stay stale)."
         ),
     )
@@ -504,13 +519,14 @@ def main():
                 mask_out = out_masks / f"{sample_id}.png"
                 bbox_out = out_bboxes / f"{sample_id}.json"
                 yolo_out = out_bboxes_yolo / f"{sample_id}.txt"
-                if (
-                    not args.force
-                    and img_out.is_file()
-                    and mask_out.is_file()
-                    and bbox_out.is_file()
-                    and yolo_out.is_file()
-                ):
+                complete = img_out.is_file() and mask_out.is_file()
+                if args.with_bboxes:
+                    complete = (
+                        complete
+                        and bbox_out.is_file()
+                        and yolo_out.is_file()
+                    )
+                if not args.force and complete:
                     skipped += 1
                     continue
                 if process_sample(
@@ -522,6 +538,7 @@ def main():
                     out_masks,
                     out_bboxes,
                     out_bboxes_yolo,
+                    with_bboxes=args.with_bboxes,
                 ):
                     success += 1
             print(
@@ -530,7 +547,7 @@ def main():
             )
             if skipped > 0 and not args.force:
                 print(
-                    "Hint: skipped rows kept old mask/bbox/YOLO files. "
+                    "Hint: skipped rows kept old outputs. "
                     "Use --force to regenerate everything (e.g. after adding SpallingPlugMaterial)."
                 )
     else:
@@ -555,7 +572,8 @@ def main():
     legend_path = write_class_names_legend(output_dir)
     print(f"Class legend: {legend_path}")
 
-    write_coco_aggregate(output_dir, out_bboxes, ids)
+    if args.with_bboxes:
+        write_coco_aggregate(output_dir, out_bboxes, ids)
 
     return 0
 
@@ -630,5 +648,6 @@ if __name__ == "__main__":
 #   python prepare_defect_annotated_dataset.py -i /path/to/all_frames -o /path/to/out
 #
 # Output: <output-folder>/images/*.png, masks/*.png, splits/train.txt, val.txt, test.txt, class_names.txt
+# Add --with-bboxes for bboxes/, bboxes_yolo/, annotations_coco.json
 # Re-run: skips existing pairs unless --force; always rewrites splits from all complete pairs.
 # Splits only: python prepare_defect_annotated_dataset.py --splits-only -o <out>

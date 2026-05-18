@@ -67,8 +67,8 @@ Run the commands below from the **`infinigen/`** directory (or put that director
 
 **YOLO labels and bbox JSON** are **not** produced inside Blender during **`--task render`**. The render writes RGB + material segmentation (`MaterialSegmentation/`, `Materials/`).
 
-- **Enable** the packaged detection + segmentation dataset: run **`tools/prepare_defect_annotated_dataset.py`** (§3). That script always emits **`images/`**, **`masks/`**, **`bboxes/`**, and **`bboxes_yolo/`** together (there is no Gin flag to turn YOLO off inside the preparer).
-- **Skip detection exports**: if you only need raw frames and material-index maps, **do not run** §3. If you ran the preparer but train **segmentation only**, use **`masks/`** (and **`images/`**) and ignore or remove **`bboxes/`** and **`bboxes_yolo/`**.
+- **Packaged training data** from renders: run **`tools/prepare_defect_annotated_dataset.py`** (§3). By default it writes **`images/`**, **`masks/`**, **`splits/`**, and **`class_names.txt`**. Pass **`--with-bboxes`** when you also need **`bboxes/`**, **`bboxes_yolo/`**, and **`annotations_coco.json`**.
+- **Raw frames only**: if you only need RGB + material-index maps under your render tree, **do not run** §3.
 
 #### 1. Coarse scene generation (example: 10 bedrooms)
 
@@ -127,14 +127,18 @@ done
 
 Under each **`rig*_rs*`** folder you should see **`Image/`**, **`MaterialSegmentation/`**, and **`Materials/`** (after the compositor reorganizes outputs). Use the same layout for multiple room types by extending the `for room in ...` list (e.g. `bathroom kitchen`).
 
-#### 3. Defect masks, COCO-style bboxes, and YOLO labels
+#### 3. Defect segmentation masks (optional bbox / YOLO / COCO)
 
-**`tools/prepare_defect_annotated_dataset.py`** walks an `all_frames`-style tree, writes a flat training pack:
+**`tools/prepare_defect_annotated_dataset.py`** walks an `all_frames`-style tree and writes a flat training pack. **By default** (segmentation only):
 
 - **`images/`**, **`masks/`** (semantic defect classes)
+- **`class_names.txt`**, **`splits/`**
+
+Pass **`--with-bboxes`** to also emit detection sidecars:
+
 - **`bboxes/`** (per-image JSON, pixel boxes; spalling plugs share the **spalling** class with wall spalling)
 - **`bboxes_yolo/`** (YOLO detection lines: `cls xc yc w h` normalized; `cls` 0–4)
-- **`class_names.txt`**, **`splits/`**, **`annotations_coco.json`**
+- **`annotations_coco.json`**
 
 ```bash
 python tools/prepare_defect_annotated_dataset.py \
@@ -142,9 +146,11 @@ python tools/prepare_defect_annotated_dataset.py \
   -o /path/to/defect_annotated_dataset
 ```
 
-After changing class rules or bbox logic, regenerate existing files with **`--force`**. The script skips samples when all of `images`, `masks`, `bboxes`, and `bboxes_yolo` already exist unless **`--force`** is set.
+Add **`--with-bboxes`** to the same command when you need bbox and COCO outputs.
 
-**One frame only** (same logic as the full exporter):
+After changing class rules or bbox logic, regenerate existing files with **`--force`**. The script skips a sample when **`images/`** and **`masks/`** for that id already exist (and, if **`--with-bboxes`**, when **`bboxes/`** and **`bboxes_yolo/`** exist too), unless **`--force`** is set.
+
+**One frame only** (same logic as the full exporter; add **`--with-bboxes`** for JSON/YOLO/COCO on that frame):
 
 ```bash
 python tools/prepare_defect_single_sample.py \
