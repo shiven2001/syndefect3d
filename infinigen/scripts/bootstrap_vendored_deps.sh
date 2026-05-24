@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Restore Infinigen git submodules and a few upstream-only asset dirs missing from
-# a plain copy of infinigen/ (without .gitmodules / submodule init).
+# Refresh vendored Infinigen dependencies (see ../VENDORED.md).
+# Normal clones already include these; use this only to pull newer upstream pins.
+# After running, remove nested .git dirs before committing: rm -rf infinigen/infinigen_gpl/.git infinigen/OcMesher/.git
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

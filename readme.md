@@ -56,13 +56,7 @@ Generation is driven by [Gin](https://github.com/google/gin-config) configs. See
 
 Run the commands below from the **`infinigen/`** directory (or put that directory on `PYTHONPATH`), after completing Infinigen’s [installation](https://github.com/princeton-vl/infinigen/blob/main/docs/Installation.md).
 
-If you see **`ModuleNotFoundError: No module named 'infinigen.infinigen_gpl'`** (or similar missing submodule / asset paths), the vendored `infinigen/` tree is incomplete. From **`infinigen/`** run:
-
-```bash
-bash scripts/bootstrap_vendored_deps.sh
-```
-
-That pulls **`infinigen_gpl`**, **`OcMesher`**, and a few upstream-only creature asset folders pinned to the current Infinigen release.
+**`infinigen_gpl`**, **`OcMesher`**, and required creature asset folders are **vendored in this repo** (see [`infinigen/VENDORED.md`](infinigen/VENDORED.md))—no `git submodule` step. To refresh those trees from upstream later, run `bash scripts/bootstrap_vendored_deps.sh` inside **`infinigen/`**.
 
 #### Defect-focus cameras and YOLO / bbox exports
 
