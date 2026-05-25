@@ -29,7 +29,43 @@ This project is licensed under the **GNU General Public License v3.0** — see [
 
 ## Dataset
 
-_Add dataset name, download link, and a short description of splits and annotations when released._
+**[SynDefect3D Dataset](https://huggingface.co/datasets/shiven2001/syndefect3d-dataset)** on Hugging Face — procedurally generated indoor scenes images with building defects (cracks, paint peel, spalling, bubbles, exposed wiring), built with this repository’s Infinigen-based pipeline.
+
+**Download:** [https://huggingface.co/datasets/shiven2001/syndefect3d-dataset](https://huggingface.co/datasets/shiven2001/syndefect3d-dataset)
+
+```python
+from datasets import load_dataset
+ds = load_dataset("shiven2001/syndefect3d-dataset")
+# splits: train, validation, test (sample IDs per row)
+```
+
+### Splits
+
+| Split | Rows (approx.) |
+|-------|----------------|
+| `train` | 19,400 |
+| `validation` | 4,150 |
+| `test` | 4,150 |
+
+**Total:** 27,680 samples. Each row is a **sample id** (e.g. `bedroom18_rig15_rs4_rig15_camera_0`) encoding room type, camera rig, resample index, and camera subfolder — matching the `all_frames` layout used by `tools/prepare_defect_annotated_dataset.py`.
+
+### Annotations
+
+The Hub repo bundles scene assets and metadata for defect inspection. From rendered frames you can build (see §3 in this readme):
+
+- **`images/`** — RGB frames
+- **`masks/`** — semantic defect segmentation (classes 0–5; see `class_names.txt`)
+- **`splits/`** — train / val / test lists
+
+The dataset card index lists sample ids under the default subset; full imagery and masks are produced locally via the export tools or stored alongside the release assets on the Hub.
+
+### Sample gallery
+
+![Sample renders from SynDefect3D](sample/generated_grid.png)
+
+*Example grid of synthetic indoor views and defect-focused wall close-ups.*
+
+The public dataset is released under **[GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.html)**, consistent with this repository.
 
 ### Acknowledgements
 
@@ -47,8 +83,6 @@ Additional open-source assets used in this generator:
 - Grohe G-31191001 and Grohe G-32667001 by trendforward — [Sketchfab](https://skfb.ly/6XDQ2)
 - Modern Faucet (high poly) by Elasta Kristya — [Sketchfab](https://skfb.ly/6YER3)
 - Roca Element Bidet Mixer by Toss90 — [Sketchfab](https://skfb.ly/6ZFS4)
-
----
 
 ### Usage
 
@@ -69,8 +103,7 @@ Run the commands below from the **`infinigen/`** directory (or put that director
 
 **YOLO labels and bbox JSON** are **not** produced inside Blender during **`--task render`**. The render writes RGB + material segmentation (`MaterialSegmentation/`, `Materials/`).
 
-- **Packaged training data** from renders: run **`tools/prepare_defect_annotated_dataset.py`** (§3). By default it writes **`images/`**, **`masks/`**, **`splits/`**, and **`class_names.txt`**. Pass **`--with-bboxes`** when you also need **`bboxes/`**, **`bboxes_yolo/`**, and **`annotations_coco.json`**.
-- **Raw frames only**: if you only need RGB + material-index maps under your render tree, **do not run** §3.
+- **Packaged training data** from renders: run **`tools/prepare_defect_annotated_dataset.py`** (§3). By default it writes **`images/`**, **`masks/`**, **`splits/`**, and **`class_names.txt`**.
 
 #### 1. Coarse scene generation (example: 10 bedrooms)
 
@@ -129,18 +162,12 @@ done
 
 Under each **`rig*_rs*`** folder you should see **`Image/`**, **`MaterialSegmentation/`**, and **`Materials/`** (after the compositor reorganizes outputs). Use the same layout for multiple room types by extending the `for room in ...` list (e.g. `bathroom kitchen`).
 
-#### 3. Defect segmentation masks (optional bbox / YOLO / COCO)
+#### 3. Defect segmentation masks
 
 **`tools/prepare_defect_annotated_dataset.py`** walks an `all_frames`-style tree and writes a flat training pack. **By default** (segmentation only):
 
 - **`images/`**, **`masks/`** (semantic defect classes)
 - **`class_names.txt`**, **`splits/`**
-
-Pass **`--with-bboxes`** to also emit detection sidecars:
-
-- **`bboxes/`** (per-image JSON, pixel boxes; spalling plugs share the **spalling** class with wall spalling)
-- **`bboxes_yolo/`** (YOLO detection lines: `cls xc yc w h` normalized; `cls` 0–4)
-- **`annotations_coco.json`**
 
 ```bash
 python tools/prepare_defect_annotated_dataset.py \
@@ -148,9 +175,7 @@ python tools/prepare_defect_annotated_dataset.py \
   -o /path/to/defect_annotated_dataset
 ```
 
-Add **`--with-bboxes`** to the same command when you need bbox and COCO outputs.
-
-After changing class rules or bbox logic, regenerate existing files with **`--force`**. The script skips a sample when **`images/`** and **`masks/`** for that id already exist (and, if **`--with-bboxes`**, when **`bboxes/`** and **`bboxes_yolo/`** exist too), unless **`--force`** is set.
+Add **`--with-bboxes`** to the same command when you need loose bbox and COCO outputs from the defect planes directly. Otherwsie, we recommend building the YOLO lables from the mask segmentation instead for tight bboxes.
 
 **One frame only** (same logic as the full exporter; add **`--with-bboxes`** for JSON/YOLO/COCO on that frame):
 
@@ -159,16 +184,6 @@ python tools/prepare_defect_single_sample.py \
   -i /path/to/all_frames \
   --sample-id bathroom08_rig18_rs1_rig18_camera_0 \
   -o /tmp/one_sample_export
-```
-
-**Quick visual check** of boxes on raw frames (uses the same bbox logic as the preparer):
-
-```bash
-python tools/visualize_defect_yolo_annotations.py \
-  -i /path/to/all_frames \
-  --sample-id bathroom08_rig18_rs1_rig18_camera_0 \
-  -o preview.png \
-  --print-yolo
 ```
 
 #### 4. Export for Isaac Sim / Omniverse
@@ -185,8 +200,6 @@ python -m infinigen.tools.export \
 ```
 
 - **`-r 2048`** sets the resolution for exported textures.
-
----
 
 ### Contact
 
