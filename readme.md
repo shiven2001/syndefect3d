@@ -33,12 +33,6 @@ This project is licensed under the **GNU General Public License v3.0** — see [
 
 **Download:** [https://huggingface.co/datasets/shiven2001/syndefect3d-dataset](https://huggingface.co/datasets/shiven2001/syndefect3d-dataset)
 
-```python
-from datasets import load_dataset
-ds = load_dataset("shiven2001/syndefect3d-dataset")
-# splits: train, validation, test (sample IDs per row)
-```
-
 ### Splits
 
 | Split | Rows (approx.) |
