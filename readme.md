@@ -67,16 +67,17 @@ This work builds on **[Infinigen](https://infinigen.org)** ([code](https://githu
 
 Additional open-source assets used in this generator:
 
-- Air Conditioner by Daniyal Malik — [Sketchfab](https://skfb.ly/o6G6o)
-- Air condition Daikin by maxsbond.work — [Sketchfab](https://skfb.ly/6R7V7)
-- Indoor air conditioner unit by Rylae Shylna — [Sketchfab](https://skfb.ly/6S8W8)
-- UK wall plug socket by Geng4d — [Sketchfab](https://skfb.ly/6T9X9)
-- UK Plug Socket by Tenakin — [Sketchfab](https://skfb.ly/6UANY)
-- Twin Plug Socket by Sousinho — [Sketchfab](https://skfb.ly/6VBOZ)
-- Wall Power Outlet - Type I by cdcruz — [Sketchfab](https://skfb.ly/6WCP1)
-- Grohe G-31191001 and Grohe G-32667001 by trendforward — [Sketchfab](https://skfb.ly/6XDQ2)
-- Modern Faucet (high poly) by Elasta Kristya — [Sketchfab](https://skfb.ly/6YER3)
-- Roca Element Bidet Mixer by Toss90 — [Sketchfab](https://skfb.ly/6ZFS4)
+- Wall-mounted air conditioner by Daniyal Malik — [Sketchfab](https://skfb.ly/68VuF)
+- Daikin wall air conditioner by maxsbond.work — [Sketchfab](https://skfb.ly/o7WQR)
+- Indoor air conditioner unit by Rylae Shylna — [Sketchfab](https://skfb.ly/p7PPP)
+- UK wall plug outlet by Geng4d — [Sketchfab](https://skfb.ly/oTPWN)
+- UK wall plug outlet by Tenakin — [Sketchfab](https://skfb.ly/p7WOq)
+- Twin plug socket by Sousinho — [Sketchfab](https://skfb.ly/oCIOT)
+- Type I wall power outlet by cdcruz — [Sketchfab](https://skfb.ly/ow6LI)
+- Grohe G-31191001 faucet by trendforward — [Sketchfab](https://skfb.ly/onMQt)
+- Grohe G-32667001 faucet by trendforward — [Sketchfab](https://skfb.ly/onMQV)
+- Modern faucet by Elasta Kristya — [Sketchfab](https://skfb.ly/6TTBD)
+- Roca Element wall-mounted bidet mixer by Toss90 — [Sketchfab](https://skfb.ly/ooL7r)
 
 ### Usage
 
