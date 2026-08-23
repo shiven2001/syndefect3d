@@ -5,12 +5,12 @@
 # Authors: Lingjie Mei
 from infinigen.assets.materials.ceramic import tile
 
-from .wood import shader_wood
+from .wood import shader_wood_floor
 
 
 class CrossedWoodTile:
     def generate(self):
-        shader_func = shader_wood
+        shader_func = shader_wood_floor
         return tile.Tile().generate(shader_func, "crossed")
 
     __call__ = generate

@@ -79,7 +79,7 @@ class WhitePlywood:
         return surface.shaderfunc_to_material(shader_shelves_white)
 
     def apply(self, obj, selection=None, **kwargs):
-        common.apply(obj, shader_shelves_white, selection, **kwargs)
+        common.apply(obj, shader_shelves_white, selection, **{**self.params, **kwargs})
 
     __call__ = generate
 

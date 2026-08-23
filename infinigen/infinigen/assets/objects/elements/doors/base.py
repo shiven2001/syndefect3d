@@ -653,16 +653,16 @@ class BaseDoorFactory(AssetFactory):
             self.width = constants.door_width
             self.height = constants.door_size
             self.constants = constants
-            self.depth = constants.wall_thickness * log_uniform(0.25, 0.5)
+            self.depth = min(0.045, constants.wall_thickness * 0.32)
             self.panel_margin = log_uniform(0.08, 0.12)
             self.bevel_width = uniform(0.005, 0.01)
             self.out_bevel = uniform() < 0.7
-            self.shrink_width = log_uniform(0.005, 0.06)
+            self.shrink_width = 0.008
 
-            self.surface = weighted_sample(material_assignments.hard_materials)()
-            self.has_glass = uniform(0, 1.0) < 0.5
+            self.surface = weighted_sample(material_assignments.doors)()
+            self.has_glass = uniform(0, 1.0) < 0.2
             self.glass_surface = weighted_sample(material_assignments.glasses)()
-            self.louver_surface = weighted_sample(material_assignments.hard_materials)()
+            self.louver_surface = self.surface
             self.handle_surface = weighted_sample(material_assignments.metal_neutral)()
             self.has_louver = True
 
@@ -670,22 +670,12 @@ class BaseDoorFactory(AssetFactory):
                 ["knob", "lever", "pull", "bar", "none"]
             )
 
-            self.door_frame_style = np.random.choice(
-                [
-                    "single_column",
-                    "full_frame_square",
-                    # "full_frame_dome",  # commented out - no arch-top doors
-                    # "full_frame_double_door",  # commented out - cutouts are always single width
-                ]
-            )
-            # Defensive: ensure no arch-top doors (e.g. if full_frame_dome ever selected)
-            if self.door_frame_style == "full_frame_dome":
-                self.door_frame_style = "full_frame_square"
-            self.door_frame_width = uniform(0.02, 0.06)
-
-            self.door_orientation = np.random.choice(
-                ["left", "right"]
-            )  # handle on left/right for push
+            # Room cutters are a fixed rectangle parented at +door_width/2.
+            # full_frame_* shifts the leaf by ~half a door; left-hinge flips it
+            # the other way. Keep the style that fills that opening.
+            self.door_frame_style = "single_column"
+            self.door_frame_width = 0.04
+            self.door_orientation = "right"
 
             self.handle_offset = self.panel_margin * 0.5
             self.handle_height = self.height * uniform(0.45, 0.5)
@@ -758,7 +748,7 @@ class BaseDoorFactory(AssetFactory):
             self.pull_radius = uniform(0.01, 0.02)
             self.pull_type = np.random.choice(["u", "tee", "zed"])
             self.is_pull_circular = uniform() < 0.5 or self.pull_type == "zed"
-            self.panel_surface = weighted_sample(material_assignments.frame)()
+            self.panel_surface = weighted_sample(material_assignments.doors)()
             self.auto_bevel = BevelSharp()
             self.auto_bevel.amount = 0.001
             self.side_bevel = log_uniform(0.005, 0.015)
@@ -813,8 +803,8 @@ class BaseDoorFactory(AssetFactory):
         # compute the center offset so that door is at the very center of the frame
         if self.door_frame_style == "single_column":
             center_z_offset = 0.0
-            center_x_offset = -0.5 * self.door_frame_width
-            door_frame_width = self.width  # dummy
+            center_x_offset = 0.0
+            door_frame_width = self.width
             full_frame = False
             top_dome = False
             is_double_door = False
@@ -875,7 +865,7 @@ class BaseDoorFactory(AssetFactory):
 
         self.auto_bevel(door_frame)
         door_frame = add_bevel(
-            door_frame, get_bevel_edges(door), offset=self.side_bevel
+            door_frame, get_bevel_edges(door_frame), offset=self.side_bevel
         )
 
         # arc for dome frame

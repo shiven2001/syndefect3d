@@ -8,5 +8,5 @@ from .square_wood_tile import SquareWoodTile
 from .staggered_wood_tile import StaggeredWoodTile
 from .table_wood import TableWood
 from .tiled_wood import TiledWood
-from .wood import Wood
+from .wood import InteriorWood, Wood
 from .wood_old import WoodOld

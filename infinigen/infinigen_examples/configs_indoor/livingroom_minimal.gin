@@ -12,7 +12,7 @@ restrict_solving.restrict_parent_rooms=["LivingRoom"]
 # Filter to only ceiling light, defect, AC, and wall plug constraints
 # Keeps: ceiling_lights, defects, ac_units, wall_plugs
 # Removes: sofa, sofa_positioning, tv, livingroom_objects
-restrict_solving.consgraph_filters=["ceiling_lights", "cracks", "paint_peel", "spalling", "spalling_plug", "wall_bubbles", "weak_leak_stain", "open_wiring", "ac_units", "wall_plugs"]
+restrict_solving.consgraph_filters=["ceiling_lights", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ac_units", "wall_plugs"]
 
 # Disable terrain and other features
 compose_indoors.terrain_enabled = False
@@ -29,7 +29,7 @@ compose_indoors.skirting_floor_chance = 0.5
 compose_indoors.skirting_ceiling_chance = 0.5
 
 # Door settings - make ALL doors completely closed
-# populate_doors.all_closed = True
+populate_doors.all_closed = True
 populate_doors.door_chance = 1.0
 
 # Fast solve

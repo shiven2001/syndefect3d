@@ -21,7 +21,7 @@ import infinigen.assets.scatters
 from infinigen.core import init
 from infinigen.core.placement import camera as cam_util
 from infinigen.core.rendering.render import render_image
-from infinigen.core.rendering.resample import resample_scene
+from infinigen.core.rendering.resample import apply_realism_adjustments, resample_scene
 from infinigen.core.tagging import tag_system
 from infinigen.core.util import blender as butil
 from infinigen.core.util import exporting
@@ -57,6 +57,7 @@ def render(
         bpy.data.objects["water_fine"].hide_viewport = True
     if resample_idx is not None and resample_idx != 0:
         resample_scene(int_hash((scene_seed, resample_idx)))
+    apply_realism_adjustments(scene_seed=scene_seed, resample_idx=resample_idx)
     with Timer("Render Frames"):
         render_image_func(frames_folder=Path(output_folder), camera=camera)
 

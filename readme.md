@@ -96,6 +96,8 @@ Run the commands below from the **`infinigen/`** directory (or put that director
   `-p camera.add_defect_focus.enabled=True`  
   to add **extra** camera rigs—**one additional rig per defect**—with head-on views. Your render loop should still use **`tools/count_camera_rigs.py`** so rig indices stay correct as the rig count grows.
 
+**Phone-like realism (v2):** layer [`infinigen_examples/configs_indoor/realism_v2.gin`](infinigen/infinigen_examples/configs_indoor/realism_v2.gin) after your room + `defect_render` configs. Pass both on **one** `-g` line (or repeated `-g` flags): `-g bedroom_minimal.gin realism_v2.gin`. It lowers compositor contrast, desaturates room surfaces, adds mild lens distortion/grain, enables defect-focus cameras (closer, 28 mm, slight pose jitter), softer multi-sun lighting, and optional inspection-spot fill. Defaults in `base_indoors.gin` / `defect_render.gin` are unchanged until you pass `realism_v2.gin`. See [`REALISM_IMPROVEMENTS.md`](REALISM_IMPROVEMENTS.md).
+
 **YOLO labels and bbox JSON** are **not** produced inside Blender during **`--task render`**. The render writes RGB + material segmentation (`MaterialSegmentation/`, `Materials/`).
 
 - **Packaged training data** from renders: run **`tools/prepare_defect_annotated_dataset.py`** (§3). By default it writes **`images/`**, **`masks/`**, **`splits/`**, and **`class_names.txt`**.
@@ -171,6 +173,8 @@ python tools/prepare_defect_annotated_dataset.py \
 ```
 
 Add **`--with-bboxes`** to the same command when you need loose bbox and COCO outputs from the defect planes directly. Otherwsie, we recommend building the YOLO lables from the mask segmentation instead for tight bboxes.
+
+Add **`--realism-postprocess`** to desaturate / brighten / add grain on export without re-rendering (fast ablation; see `REALISM_IMPROVEMENTS.md` §5.1).
 
 **One frame only** (same logic as the full exporter; add **`--with-bboxes`** for JSON/YOLO/COCO on that frame):
 

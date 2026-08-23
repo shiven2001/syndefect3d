@@ -18,11 +18,14 @@ from infinigen.core.constraints.example_solver.geometry import parse_scene
 from infinigen.core.constraints.example_solver.state_def import State
 from infinigen.core.placement.placement import parse_asset_name
 from infinigen.core.util import blender as butil
+from infinigen.core.util.math import int_hash
 
 logger = logging.getLogger(__name__)
 
 # Filled by populate_state_placeholders; consumed by generate_indoors after room_walls
 deferred_wall_bubble_finalize = []
+deferred_paint_run_finalize = []
+deferred_paint_patch_finalize = []
 
 
 def apply_cutter(state, objkey, cutter):
@@ -81,6 +84,8 @@ def populate_state_placeholders(state: State, filter=None, final=True):
     update_state_mesh_objs = []
     deferred_spalling_plug_objs = []
     deferred_wall_bubble_objs = []
+    deferred_paint_run_objs = []
+    deferred_paint_patch_objs = []
 
     for i, objkey in enumerate(targets):
         os = state.objs[objkey]
@@ -92,6 +97,15 @@ def populate_state_placeholders(state: State, filter=None, final=True):
         update_state_mesh_objs.append((objkey, old_objname))
 
         *_, inst_seed = parse_asset_name(placeholder.name)
+        if inst_seed is None:
+            # Blender clips object names at 63 chars; a long factory name can
+            # drop the trailing seed. Hash the leftover name so populate continues.
+            inst_seed = int_hash(placeholder.name) % 10_000_000
+            logger.warning(
+                "Could not parse instance seed from %r; using %s",
+                placeholder.name,
+                inst_seed,
+            )
         os.obj = os.generator.spawn_asset(
             i=int(inst_seed),
             loc=placeholder.location,  # we could use placeholder=pholder here, but I worry pholder may have been modified
@@ -105,6 +119,10 @@ def populate_state_placeholders(state: State, filter=None, final=True):
         # so .wall objects with materials exist.
         elif os.generator.__class__.__name__ == "WallBubblePlaneFactory":
             deferred_wall_bubble_objs.append((os.generator, os.obj))
+        elif os.generator.__class__.__name__ == "PaintRunPlaneFactory":
+            deferred_paint_run_objs.append((os.generator, os.obj))
+        elif os.generator.__class__.__name__ == "PaintPatchPlaneFactory":
+            deferred_paint_patch_objs.append((os.generator, os.obj))
         else:
             os.generator.finalize_assets([os.obj])
         butil.put_in_collection(os.obj, unique_assets)
@@ -131,6 +149,10 @@ def populate_state_placeholders(state: State, filter=None, final=True):
     # WallBubblePlaneFactory finalize runs after room_walls (see generate_indoors)
     deferred_wall_bubble_finalize.clear()
     deferred_wall_bubble_finalize.extend(deferred_wall_bubble_objs)
+    deferred_paint_run_finalize.clear()
+    deferred_paint_run_finalize.extend(deferred_paint_run_objs)
+    deferred_paint_patch_finalize.clear()
+    deferred_paint_patch_finalize.extend(deferred_paint_patch_objs)
 
     unique_assets.hide_viewport = False
 

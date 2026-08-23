@@ -551,6 +551,9 @@ def pose_defect_cameras(
     If ``one_to_one`` is True, rigs are paired with defects sorted by object name
     (same count expected). Otherwise defects are shuffled and assigned round-robin.
     Optional jitter uses ``horizontal_jitter`` and ``height_jitter`` (0 = none).
+
+    Phone-like close-ups are configured in ``realism_v2.gin``
+    (``camera.pose_defect_cameras.*``); defaults here keep the original 1.4 m / 40 mm look.
     """
     if not defect_objs:
         logger.warning("pose_defect_cameras: no defect objects found, skipping")

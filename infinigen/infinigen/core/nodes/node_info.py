@@ -255,6 +255,8 @@ class Nodes:
     RenderLayers = "CompositorNodeRLayers"
     LensDistortion = "CompositorNodeLensdist"
     Glare = "CompositorNodeGlare"
+    HueSaturation = "CompositorNodeHueSat"
+    CompositorTexture = "CompositorNodeTexture"
 
     # World Nodes
     SkyTexture = "ShaderNodeTexSky"

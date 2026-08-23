@@ -25,13 +25,14 @@ def nishita_lighting(
     strength=("uniform", 0.18, 0.22),
     sun_intensity=("uniform", 0.8, 1),
     sun_elevation=("spherical_sample", 10, None),
+    sun_size_deg=("clip_gaussian", 0.5, 0.3, 0.25, 5),
     dynamic=False,
     rising_angle=90,
     camera_based_rotation=None,
 ):
     sky_texture = nw.new_node(Nodes.SkyTexture)
     sky_texture.sky_type = "NISHITA"
-    sky_texture.sun_size = np.deg2rad(clip_gaussian(0.5, 0.3, 0.25, 5))
+    sky_texture.sun_size = np.deg2rad(rg(sun_size_deg))
     sky_texture.sun_intensity = rg(sun_intensity)
     sky_texture.sun_elevation = np.radians(rg(sun_elevation))
     if camera_based_rotation is None:
@@ -100,6 +101,7 @@ def add_multi_directional_sun_lighting(
     n_directions: int = 2,
     elevation_deg: float = 40.0,
     energy_per_sun: float = 2.0,
+    sun_angle_deg: float = 0.53,
 ):
     """
     Add sun lamps from multiple directions so light shines through all sides
@@ -118,17 +120,31 @@ def add_multi_directional_sun_lighting(
         sun.name = f"SunMulti_{i}"
         sun.rotation_euler = (rot_x, 0, rot_z)
         sun.data.energy = energy_per_sun
+        sun.data.angle = math.radians(sun_angle_deg)
 
 
 @gin.configurable
 def add_camera_based_lighting(
-    energy=("log_uniform", 200, 500), spot_size=("uniform", np.pi / 6, np.pi / 4)
+    enabled=False,
+    energy=("log_uniform", 200, 500),
+    spot_size=("uniform", np.pi / 6, np.pi / 4),
 ):
+    """Optional inspection / phone-flash spot from the active camera.
+
+    Disabled by default so existing indoor lighting is unchanged. Enable via gin
+    (``add_camera_based_lighting.enabled = True``) for close-up defect renders.
+    """
+    if not enabled:
+        return None
     camera = bpy.context.scene.camera
+    if camera is None:
+        return None
     bpy.ops.object.light_add(
         type="SPOT", location=camera.location, rotation=camera.rotation_euler
     )
     spot = bpy.context.active_object
+    spot.name = "InspectionSpot"
     spot.data.energy = rg(energy)
     spot.data.spot_size = rg(spot_size)
     spot.data.spot_blend = uniform(0.6, 0.8)
+    return spot

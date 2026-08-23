@@ -608,8 +608,17 @@ class SpallingPlugPlaneFactory(AssetFactory):
                 # 1. Improved name check to ensure we find the Infinigen-generated plugs
                 def is_wall_plug(o):
                     n = o.name.lower()
-                    return "staticwallplug" in n or any(
-                        k in n for k in ("wall_socket", "socket", "outlet")
+                    if "spalling" in n:
+                        return False
+                    return any(
+                        k in n
+                        for k in (
+                            "wallplug",
+                            "wall_plug",
+                            "wall_socket",
+                            "socket",
+                            "outlet",
+                        )
                     )
 
                 wall_plugs = [o for o in bpy.data.objects if is_wall_plug(o)]

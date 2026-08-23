@@ -6,12 +6,12 @@
 
 from infinigen.assets.materials.ceramic import tile
 
-from .wood import shader_wood
+from .wood import shader_wood_floor
 
 
 class StaggeredWoodTile:
     def generate(self):
-        shader_func = shader_wood
+        shader_func = shader_wood_floor
         return tile.Tile().generate(shader_func, "staggered")
 
     __call__ = generate

@@ -61,14 +61,6 @@ def _modify_wall_mat_for_bubble(mat: bpy.types.Material) -> bpy.types.Material:
         links.new(from_socket, add_node.inputs[0])
         links.new(add_node.outputs["Vector"], base_color_in)
 
-    # 2. All noise nodes: scale = 1
-    for node in nodes:
-        if node.type != "TEX_NOISE":
-            continue
-        scale_in = node.inputs.get("Scale")
-        if scale_in is not None:
-            scale_in.default_value = 1.0
-
     return mat
 
 
@@ -93,7 +85,7 @@ def _get_distorted_displacement(
     noise_scale: float = 2.5,
     noise_strength: float = 0.3,
 ) -> float:
-    """Compute Z displacement for bubble bulges (cosine falloff from center)."""
+    """Paint-film blister: wide soft mound, not a hemisphere sitting on the plane."""
     vec_x = Vector((x, y, 0.0))
     vec_y = Vector((y, x, 1.2))
     off_x = _get_fractal_noise(vec_x, octaves=4, scale=noise_scale) * noise_strength
@@ -101,14 +93,22 @@ def _get_distorted_displacement(
     distorted_x = x + off_x
     distorted_y = y + off_y
 
-    total_z = 0.0
-    for b_x, b_y, radius, height in bubbles:
+    large_z = 0.0
+    micro_z = 0.0
+    for b_x, b_y, radius, height, kind in bubbles:
         dist = math.sqrt((distorted_x - b_x) ** 2 + (distorted_y - b_y) ** 2)
-        if dist < radius:
-            t = dist / radius
-            displacement = height * math.cos((math.pi / 2) * t)
-            total_z = max(total_z, displacement)
-    return total_z
+        if dist >= radius:
+            continue
+        t = dist / radius
+        # Smootherstep skirt: flat-ish peak, fillet into the wall (no hard rim).
+        s = t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
+        fall = (1.0 - s) ** 2
+        disp = height * fall
+        if kind == "micro":
+            micro_z += disp
+        else:
+            large_z = max(large_z, disp)
+    return large_z + micro_z * 0.55
 
 
 def create_distorted_blob_plane(
@@ -152,24 +152,41 @@ def create_distorted_blob_plane(
     blue_mat = make_background_material("WallBubbleBackground")
     # white_mat = make_complex_material("WallBubbleBump", scale=50.0)
 
-    # --- 2. Bubble Generation ---
+    # Clustered blisters: a few wide mounds plus overlapping mid/micro pebbles.
     bubbles = []
     half_bound = (size / 2) - edge_margin
-    attempts = 0
-    while len(bubbles) < num_bubbles and attempts < 500:
-        attempts += 1
-        r = float(rng.uniform(min_radius, max_radius))
-        limit = half_bound - r
-        if limit <= 0:
-            continue
+    n_large = max(1, num_bubbles // 2)
+    n_mid = max(2, num_bubbles)
+    n_micro = max(8, num_bubbles * 4)
+    centers = []
+    for _ in range(n_large):
+        r = float(rng.uniform(max(min_radius * 1.4, 0.08), max(max_radius * 1.3, 0.18)))
+        limit = max(half_bound - r, 0.02)
         bx = float(rng.uniform(-limit, limit))
         by = float(rng.uniform(-limit, limit))
-        if not any(
-            math.sqrt((bx - ox) ** 2 + (by - oy) ** 2) < (r + orad) * 0.7
-            for (ox, oy, orad, _) in bubbles
-        ):
-            bh = float(rng.uniform(min_height, max_height))
-            bubbles.append((bx, by, r, bh))
+        bh = float(rng.uniform(min_height, max_height))
+        bubbles.append((bx, by, r, bh, "large"))
+        centers.append((bx, by, r))
+    if not centers:
+        centers.append((0.0, 0.0, max_radius))
+    for _ in range(n_mid):
+        cx, cy, cr = centers[int(rng.integers(0, len(centers)))]
+        r = float(rng.uniform(min_radius * 0.7, max_radius * 0.85))
+        ang = float(rng.uniform(0, 2 * math.pi))
+        rad = float(rng.uniform(0.0, cr * 0.75))
+        bx = cx + math.cos(ang) * rad
+        by = cy + math.sin(ang) * rad
+        bh = float(rng.uniform(min_height * 0.6, max_height * 0.85))
+        bubbles.append((bx, by, r, bh, "mid"))
+    for _ in range(n_micro):
+        cx, cy, cr = centers[int(rng.integers(0, len(centers)))]
+        r = float(rng.uniform(0.012, 0.035))
+        ang = float(rng.uniform(0, 2 * math.pi))
+        rad = float(rng.uniform(0.0, cr * 1.05))
+        bx = cx + math.cos(ang) * rad
+        by = cy + math.sin(ang) * rad
+        bh = float(rng.uniform(min_height * 0.25, min_height * 0.7))
+        bubbles.append((bx, by, r, bh, "micro"))
 
     # --- 3. Geometry Construction ---
     bm = bmesh.new()
@@ -206,7 +223,7 @@ def create_distorted_blob_plane(
                     verts_front[i + 1][j],
                 )
             )
-            has_bump = any(v.co.z > 0.0001 for v in f_face.verts)
+            has_bump = any(v.co.z > 1e-5 for v in f_face.verts)
             f_face.material_index = 1 if has_bump else 0
 
             b_face = bm.faces.new(
@@ -296,15 +313,15 @@ class WallBubblePlaneFactory(AssetFactory):
         with FixedSeed(geom_seed):
             scale_z_val = np.random.uniform(0.6, 1.0) * self.plane_size / 2
             scale_y_val = np.random.uniform(0.6, 1.0) * self.plane_size / 2
-            num_bubbles = int(np.random.randint(2, 7))
-            min_radius = float(np.random.uniform(0.04, 0.08))
-            max_radius = float(np.random.uniform(0.12, 0.2))
-            max_radius = max(max_radius, min_radius + 0.02)
-            min_height = float(np.random.uniform(0.004, 0.01))
-            max_height = float(np.random.uniform(0.01, 0.02))
-            max_height = max(max_height, min_height + 0.003)
-            distortion_scale = float(np.random.uniform(2.0, 4.0))
-            distortion_strength = float(np.random.uniform(0.2, 0.4))
+            num_bubbles = int(np.random.randint(3, 6))
+            min_radius = float(np.random.uniform(0.07, 0.11))
+            max_radius = float(np.random.uniform(0.14, 0.24))
+            max_radius = max(max_radius, min_radius + 0.03)
+            min_height = float(np.random.uniform(0.0055, 0.0080))
+            max_height = float(np.random.uniform(0.0100, 0.0160))
+            max_height = max(max_height, min_height + 0.001)
+            distortion_scale = float(np.random.uniform(1.6, 3.0))
+            distortion_strength = float(np.random.uniform(0.08, 0.18))
 
         # Same as water_bubble.py: create_distorted_blob_plane returns obj
         plane = create_distorted_blob_plane(
@@ -327,7 +344,9 @@ class WallBubblePlaneFactory(AssetFactory):
         plane.rotation_euler = (0.0, np.pi / 2, 0.0)
         butil.apply_transform(plane, loc=False, rot=True, scale=True)
 
-        plane.visible_shadow = True
+        # The blister is a lift of the wall film. A self-shadow from the
+        # back faces reads as a floating card.
+        plane.visible_shadow = False
         plane.visible_diffuse = True
         return plane
 
@@ -335,15 +354,16 @@ class WallBubblePlaneFactory(AssetFactory):
         self, assets, state=None, wall_by_name=None, update_embed_transform=True
     ):
         """
-        Position wall-bubble planes slightly ahead of the wall (toward the room),
-        so the bubble bulge is more visible. Copy the wall's material for the
-        bubble surface so colors match the wall.
+        Seat the bubble plane a few mm into the wall so the blister is a
+        lift of the paint film. Copy the wall material onto the bulge.
         Uses state + wall_by_name to get the correct wall per bubble (avoids wrong room material).
         """
-        EMBED_OFFSET = -0.03  # negative = outward from wall (more ahead)
+        # Placeholder is 10 mm thick; origin sits ~5 mm in front of the wall.
+        # Local -X is into the wall (same axis as placeholder Back). Extra
+        # millimeters bury the flat card so only the blister mound shows.
+        EMBED_INTO_WALL = 0.010
 
         from infinigen.core import tags as t
-        from infinigen.core.tagging import tagged_face_mask
 
         # Build wall_by_name if not provided
         if wall_by_name is None:
@@ -432,26 +452,9 @@ class WallBubblePlaneFactory(AssetFactory):
                     obj.data.materials[1] = bubble_mat
 
                 if update_embed_transform:
-                    back_mask = tagged_face_mask(obj, {t.Subpart.Back})
-                    if back_mask.any():
-                        back_faces = [i for i, tag in enumerate(back_mask) if tag]
-                        if back_faces:
-                            largest_back_face_idx = max(
-                                back_faces, key=lambda idx: obj.data.polygons[idx].area
-                            )
-                            back_poly = obj.data.polygons[largest_back_face_idx]
-                        else:
-                            continue
-                    else:
-                        back_poly = max(
-                            obj.data.polygons,
-                            key=lambda p: -p.normal.y if p.normal.y < 0 else -1e6,
-                        )
-                    wall_normal = np.array(butil.global_polygon_normal(obj, back_poly))
-                    wall_normal = Vector(wall_normal).normalized()
-
-                    translation = Vector(wall_normal * EMBED_OFFSET)
-                    obj.location += translation
+                    into_wall = obj.matrix_world.to_3x3() @ Vector((-1.0, 0.0, 0.0))
+                    if into_wall.length > 1e-8:
+                        obj.location += into_wall.normalized() * EMBED_INTO_WALL
             except Exception as e:
                 logger.warning("Failed to embed wall-bubble plane %s: %s", obj.name, e)
 

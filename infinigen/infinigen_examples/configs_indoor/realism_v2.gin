@@ -1,0 +1,90 @@
+# SynDefect3D realism v2 — phone-like indoor defect renders.
+# Layer on top of existing configs; does not replace bedroom_minimal / defect_render.
+#
+# Coarse (new scenes / new defect-focus rigs):
+#   python -m infinigen_examples.generate_indoors --task coarse \
+#     -g bedroom_minimal.gin realism_v2.gin \
+#     --overrides camera.spawn_camera_rigs.n_camera_rigs=10
+#
+# Indoor runs do not need terrain libs. Keep terrain off even if bedroom_minimal
+# is omitted (a second -g used to drop the first argparse value).
+#
+# Render (existing or new blends):
+#   python -m infinigen_examples.generate_indoors --task render \
+#     -g defect_render.gin realism_v2.gin \
+#     -p render.render_image_func=@defect/render_image ...
+#
+# See REALISM_IMPROVEMENTS.md for validation and pilot re-render workflow.
+
+# --- Lighting ---
+configure_render_cycles.exposure = 1.7
+nishita_lighting.strength = 0.24
+nishita_lighting.sun_elevation = ("clip_gaussian", 22, 10, 8, 40)
+nishita_lighting.sun_size_deg = ("clip_gaussian", 2.4, 0.7, 1.2, 4.5)
+nishita_lighting.sun_intensity = ("uniform", 0.55, 0.75)
+nishita_lighting.air_density = ("clip_gaussian", 1.15, 0.15, 0.85, 1.4)
+nishita_lighting.dust_density = ("clip_gaussian", 1.35, 0.25, 0.8, 2.0)
+add_multi_directional_sun_lighting.n_directions = 3
+add_multi_directional_sun_lighting.elevation_deg = 28.0
+add_multi_directional_sun_lighting.energy_per_sun = 0.42
+add_multi_directional_sun_lighting.sun_angle_deg = 5.5
+compose_indoors.lights_off_chance = 0.0
+compose_indoors.terrain_enabled = False
+populate_doors.all_closed = True
+populate_doors.door_chance = 1.0
+populate_doors.n_doors = 1
+populate_windows.n_windows = 1
+
+# Wide indoor cameras closer to a phone (~24 mm) instead of 15 mm fisheye.
+camera.camera_pose_proposal.focal_length = 24
+
+# On-camera flash flattens wide rooms. Leave off; defect close-ups can override.
+add_camera_based_lighting.enabled = False
+
+# Render-time photo look (also applies to existing blends)
+apply_realism_adjustments.refresh_room_surfaces = True
+dull_interior_floors.enabled = True
+soften_existing_lights.enabled = True
+soften_existing_lights.sun_angle_deg = 5.5
+soften_existing_lights.sun_energy = 0.42
+configure_photo_cycles.enabled = True
+restore_ceiling_fixture_visibility.enabled = True
+
+# --- Defect cameras (must be set at coarse time for new rigs) ---
+camera.add_defect_focus.enabled = True
+camera.pose_defect_cameras.distance = 0.9
+camera.pose_defect_cameras.focal_length = 28
+camera.pose_defect_cameras.height_jitter = 0.08
+camera.pose_defect_cameras.horizontal_jitter = 0.12
+camera.pose_defect_cameras.angle_noise_deg = 6
+
+# --- Render / materials ---
+set_displacement_mode.displacement_mode = "BOTH"
+configure_render_cycles.num_samples = 1024
+configure_render_cycles.denoise = True
+
+# Extra dry-room wall/ceiling pull toward grey (tiles in kitchen/bathroom are skipped)
+desaturate_surface_materials.saturation_scale = 0.45
+desaturate_surface_materials.skip_wet_rooms = True
+
+# Builder-grade plaster (already default in plaster.py; listed for override)
+plaster_paint_params.colored_prob = 0.0
+plaster_paint_params.max_saturation = 0.04
+
+# --- Compositor: phone-like, not clean CG ---
+compositor_postprocessing.color_correct = True
+compositor_postprocessing.contrast = 1.06
+compositor_postprocessing.bright = 1.0
+compositor_postprocessing.saturation = 0.86
+compositor_postprocessing.distort = 0.018
+compositor_postprocessing.grain = 0.045
+compositor_postprocessing.glare = True
+compositor_postprocessing.glare_type = "FOG_GLOW"
+compositor_postprocessing.glare_threshold = 0.88
+compositor_postprocessing.glare_mix = -0.84
+
+# Optional phone-like DoF (uncomment to enable)
+# render_image.use_dof = True
+# render_image.dof_aperture_fstop = 2.8
+# defect/render_image.use_dof = True
+# defect/render_image.dof_aperture_fstop = 2.8

@@ -4,12 +4,17 @@
 # Authors: Alexander Raistrick
 
 import infinigen.assets.static_assets as static_assets
-from infinigen.assets.crack_plane import CrackPlaneFactory
-from infinigen.assets.paint_peel_plane import PaintPeelPlaneFactory
-from infinigen.assets.spalling_plane import SpallingPlaneFactory, SpallingPlugPlaneFactory
+from infinigen.assets.crack_plane import CeilingCrackPlaneFactory, CrackPlaneFactory
+from infinigen.assets.paint_peel_plane import (
+    CeilingPeelFactory,
+    PaintPeelPlaneFactory,
+)
+# from infinigen.assets.spalling_plane import SpallingPlaneFactory, SpallingPlugPlaneFactory  # commented out
+from infinigen.assets.paint_patch_plane import PaintPatchPlaneFactory
+from infinigen.assets.paint_run_plane import PaintRunPlaneFactory
 from infinigen.assets.wall_bubble_plane import WallBubblePlaneFactory
 # from infinigen.assets.weak_leak_stain_plane import WeakLeakStainPlaneFactory  # commented out
-from infinigen.assets.open_wiring_plane import OpenWiringPlaneFactory
+# from infinigen.assets.open_wiring_plane import OpenWiringPlaneFactory  # commented out
 from infinigen.assets.objects import (
     appliances,
     bathroom,
@@ -204,19 +209,24 @@ def home_asset_usage():
         wall_decorations.WallArtFactory,
         wall_decorations.MirrorFactory,
         wall_decorations.BalloonFactory,
-        static_assets.StaticACFactory,
-        static_assets.StaticWallPlugFactory,
-        static_assets.StaticFaucetFactory,
+        wall_decorations.SplitACFactory,
+        wall_decorations.WallPlugFactory,
+        wall_decorations.WallFaucetFactory,
+        wall_decorations.WallCableTrunkFactory,
     }
 
     used_as[Semantics.Defects] = {
         CrackPlaneFactory,
+        CeilingCrackPlaneFactory,
         PaintPeelPlaneFactory,
-        SpallingPlaneFactory,
-        SpallingPlugPlaneFactory,
+        CeilingPeelFactory,
+        # SpallingPlaneFactory,  # commented out
+        # SpallingPlugPlaneFactory,  # commented out
         WallBubblePlaneFactory,
+        PaintRunPlaneFactory,
+        PaintPatchPlaneFactory,
         # WeakLeakStainPlaneFactory,  # commented out
-        OpenWiringPlaneFactory,
+        # OpenWiringPlaneFactory,  # commented out
     }
 
     used_as[Semantics.Door] = {
@@ -258,6 +268,7 @@ def home_asset_usage():
             appliances.MonitorFactory,
             elements.RugFactory,
             bathroom.HardwareFactory,
+            wall_decorations.CeilingCableTrunkFactory,
         },
     )
 
@@ -266,12 +277,16 @@ def home_asset_usage():
 
     used_as[Semantics.RealPlaceholder] = {
         CrackPlaneFactory,  # use tagged placeholder directly (bbox path loses face tags)
+        CeilingCrackPlaneFactory,
         PaintPeelPlaneFactory,
-        SpallingPlaneFactory,
-        SpallingPlugPlaneFactory,
+        CeilingPeelFactory,
+        # SpallingPlaneFactory,  # commented out
+        # SpallingPlugPlaneFactory,  # commented out
         WallBubblePlaneFactory,
+        PaintRunPlaneFactory,
+        PaintPatchPlaneFactory,
         # WeakLeakStainPlaneFactory,  # commented out
-        OpenWiringPlaneFactory,
+        # OpenWiringPlaneFactory,  # commented out
         appliances.MonitorFactory,
         appliances.TVFactory,
         bathroom.BathroomSinkFactory,
@@ -343,6 +358,7 @@ def home_asset_usage():
         {
             bathroom.HardwareFactory,
             lamp.CeilingLightFactory,  # rotationally symetric
+            wall_decorations.CeilingCableTrunkFactory,
         },
     )
 

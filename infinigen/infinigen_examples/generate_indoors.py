@@ -418,7 +418,9 @@ def compose_indoors(
     )
     p.run_stage(
         "room_doors",
-        lambda: room_dec.populate_doors(solver.get_bpy_objects(door_filter), constants),
+        lambda: room_dec.populate_doors(
+            solver.get_bpy_objects(door_filter), constants, state
+        ),
         use_chance=False,
     )
     p.run_stage(
@@ -482,7 +484,21 @@ def compose_indoors(
             gen.finalize_assets([obj], state=state, wall_by_name=wall_by_name)
         populate.deferred_wall_bubble_finalize.clear()
 
+    def finalize_paint_runs():
+        wall_by_name = {w.name: w for w in rooms_split["wall"].objects}
+        for gen, obj in populate.deferred_paint_run_finalize:
+            gen.finalize_assets([obj], state=state, wall_by_name=wall_by_name)
+        populate.deferred_paint_run_finalize.clear()
+
+    def finalize_paint_patches():
+        wall_by_name = {w.name: w for w in rooms_split["wall"].objects}
+        for gen, obj in populate.deferred_paint_patch_finalize:
+            gen.finalize_assets([obj], state=state, wall_by_name=wall_by_name)
+        populate.deferred_paint_patch_finalize.clear()
+
     p.run_stage("paint_bubble_materials", finalize_paint_bubbles, prereq="room_walls", use_chance=False)
+    p.run_stage("paint_run_materials", finalize_paint_runs, prereq="room_walls", use_chance=False)
+    p.run_stage("paint_patch_materials", finalize_paint_patches, prereq="room_walls", use_chance=False)
     # Boolean/cutter logic (commented out - not needed):
     # p.run_stage(
     #     "spalling_plug_boolean",
@@ -506,6 +522,16 @@ def compose_indoors(
             rooms_split["ceiling"].objects,
             material_seed=overrides.get("material_seed", scene_seed + 3000),
         ),
+        use_chance=False,
+    )
+    p.run_stage(
+        "room_cable_trunks",
+        lambda: room_dec.room_cable_trunks(
+            rooms_split["wall"].objects,
+            constants,
+            ceilings=rooms_split["ceiling"].objects,
+        ),
+        prereq="room_ceilings",
         use_chance=False,
     )
 
@@ -532,9 +558,7 @@ def compose_indoors(
         rooms_split["exterior"].hide_viewport = True
         rooms_split["exterior"].hide_render = True
         invisible_to_camera.apply(list(rooms_split["ceiling"].objects))
-        invisible_to_camera.apply(
-            [o for o in bpy.data.objects if "CeilingLight" in o.name]
-        )
+        # Keep fixture meshes camera-visible so ceiling lights are not bare discs.
 
     p.run_stage("invisible_room_ceilings", invisible_room_ceilings, use_chance=False)
 
@@ -621,8 +645,9 @@ def compose_indoors(
 
 def main(args):
     scene_seed = init.apply_scene_seed(args.seed)
+    extra_configs = args.configs or []
     init.apply_gin_configs(
-        configs=["base_indoors.gin"] + args.configs,
+        configs=["base_indoors.gin"] + extra_configs,
         overrides=args.overrides,
         config_folders=[
             "infinigen_examples/configs_indoor",
@@ -667,9 +692,10 @@ if __name__ == "__main__":
         "-g",
         "--configs",
         nargs="+",
-        default=["base"],
-        help="Set of config files for gin (separated by spaces) "
-        "e.g. --gin_config file1 file2 (exclude .gin from path)",
+        action="extend",
+        default=None,
+        help="Gin configs, space-separated and/or repeated: "
+        "-g bedroom_minimal.gin realism_v2.gin   or   -g a.gin -g b.gin",
     )
     parser.add_argument(
         "-p",

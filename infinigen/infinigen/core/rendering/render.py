@@ -123,8 +123,20 @@ def compositor_postprocessing(
     color_correct=True,
     distort=0,
     glare=False,
+    glare_type="FOG_GLOW",
+    glare_threshold=0.85,
+    glare_mix=-0.82,
+    contrast=4.0,
+    bright=1.0,
+    saturation=1.0,
+    grain=0.0,
 ):
-    if distort > 0:
+    """Compositor color / lens pipeline.
+
+    Defaults match the original Infinigen look (high contrast). Override via gin
+    for phone-like realism (see ``realism_v2.gin``).
+    """
+    if distort and distort > 0:
         source = nw.new_node(
             Nodes.LensDistortion, input_kwargs={"Image": source, "Dispersion": distort}
         )
@@ -132,14 +144,35 @@ def compositor_postprocessing(
     if color_correct:
         source = nw.new_node(
             Nodes.BrightContrast,
-            input_kwargs={"Image": source, "Bright": 1.0, "Contrast": 4.0},
+            input_kwargs={"Image": source, "Bright": bright, "Contrast": contrast},
+        )
+
+    if saturation is not None and abs(float(saturation) - 1.0) > 1e-6:
+        source = nw.new_node(
+            Nodes.HueSaturation,
+            input_kwargs={"Image": source, "Saturation": float(saturation)},
+        )
+
+    if grain and grain > 0:
+        tex = bpy.data.textures.get("SynDefectFilmGrain")
+        if tex is None:
+            tex = bpy.data.textures.new("SynDefectFilmGrain", type="NOISE")
+        noise_node = nw.new_node(Nodes.CompositorTexture, attrs={"texture": tex})
+        source = nw.new_node(
+            Nodes.CompositorMixRGB,
+            input_kwargs={"Fac": float(grain), 1: source, 2: noise_node},
+            attrs={"blend_type": "ADD"},
         )
 
     if glare:
         source = nw.new_node(
             Nodes.Glare,
             input_kwargs={"Image": source},
-            attrs={"glare_type": "GHOSTS", "threshold": 0.5, "mix": -0.99},
+            attrs={
+                "glare_type": glare_type,
+                "threshold": float(glare_threshold),
+                "mix": float(glare_mix),
+            },
         )
 
     if show:

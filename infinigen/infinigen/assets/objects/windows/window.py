@@ -94,7 +94,9 @@ class WindowFactory(AssetFactory):
         curtain_depth = U(0.03, curtain_frame_depth)
         curtain_frame_radius = U(0.01, 0.02)
 
-        shader_frame_material_choice = weighted_sample(material_assignments.woods)()()
+        shader_frame_material_choice = weighted_sample(
+            material_assignments.window_frames
+        )()()
 
         shader_curtain_frame_material_choice = weighted_sample(
             material_assignments.metals
@@ -199,15 +201,8 @@ class WindowFactory(AssetFactory):
         curtain_mid_l = -U(0, width / 2)
         curtain_mid_r = U(0, width / 2)
 
-        shader_frame_material_choice = weighted_sample(material_assignments.woods)()()
-
-        shader_curtain_frame_material_choice = weighted_sample(
-            material_assignments.metals
-        )()()
-        shader_curtain_material_choice = weighted_sample(
-            material_assignments.curtain
-        )()()
-
+        # Size / layout only. Frame and glass materials are sampled once on
+        # the factory so every window in the scene matches.
         params = {
             "Width": width,
             "Height": height,
@@ -237,10 +232,6 @@ class WindowFactory(AssetFactory):
             "ShutterThickness": shutter_thickness,
             "ShutterRotation": shutter_rotation,
             "ShutterInterval": shutter_inverval,
-            "FrameMaterial": shader_frame_material_choice,
-            "CurtainFrameMaterial": shader_curtain_frame_material_choice,
-            "CurtainMaterial": shader_curtain_material_choice,
-            "Material": surface.shaderfunc_to_material(shader_window_glass),
         }
         return params
 

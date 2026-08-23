@@ -33,6 +33,19 @@ woods = [
     (wood.BlondePlywood, 0.1),
 ]
 
+# Interior doors: stained wood in varied browns; rare painted-white slab.
+doors = [
+    (wood.InteriorWood, 10.0),
+    (wood.WhitePlywood, 1.0),
+]
+
+# Window frames: wood or painted/aluminum (not black/blonde plywood).
+window_frames = [
+    (wood.InteriorWood, 6.0),
+    (wood.WhitePlywood, 3.5),
+    (metal.MetalBasic, 1.5),
+]
+
 wood_tiles = [
     (wood.CompositeWoodTile, 1.0),
     (wood.CrossedWoodTile, 1.0),
@@ -286,10 +299,11 @@ side = rail + metals
 handrail = woods + metals + fabrics
 post = handrail
 
-wall = [(ceramic.Plaster, 2.0), (ceramic.Tile, 1.0)]
+# Dry rooms: builder plaster only (no colorful wall tiles in bedrooms / living / dining).
+wall = [(ceramic.Plaster, 1.0)]
 kitchen_wall = [
-    (ceramic.Plaster, 5.0),
-    (ceramic.Tile, 2.0),
+    (ceramic.Plaster, 3.0),
+    (ceramic.Tile, 4.0),
 ]
 garage_wall = [
     (ceramic.Concrete, 5.0),

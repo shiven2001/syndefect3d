@@ -56,6 +56,55 @@ from infinigen.core.util.random import random_general as rg
 logger = logging.getLogger(__name__)
 
 
+def _placeholder_interior_y_sign(placeholder, state):
+    """+1 if placeholder +Y points into room volume, else -1 (keep doors inward)."""
+    if state is None or placeholder is None:
+        return 1.0
+    from mathutils import Vector
+
+    y_axis = placeholder.matrix_world.to_3x3() @ Vector((0.0, 1.0, 0.0))
+    origin = placeholder.matrix_world.translation
+    toward = 0.0
+    away = 0.0
+    for os in getattr(state, "objs", {}).values():
+        tags = getattr(os, "tags", set()) or set()
+        if t.Semantics.Room not in tags:
+            continue
+        obj = getattr(os, "obj", None)
+        if obj is None or obj.type != "MESH" or not getattr(obj, "bound_box", None):
+            continue
+        corners = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
+        center = sum(corners, Vector((0.0, 0.0, 0.0))) / max(len(corners), 1)
+        score = float((center - origin).dot(y_axis))
+        if score > 0.05:
+            toward += score
+        elif score < -0.05:
+            away += -score
+    if away > toward:
+        return -1.0
+    return 1.0
+
+
+def _door_cutout_local_x(factory, door_width):
+    """Parent-space X so the leaf fills the cutter, not a randomized offset.
+
+    ``populate_doors`` always used ``+door_width/2``, which only matches a
+    right-hinged ``single_column`` door. ``full_frame_*`` shifts the leaf by
+    half a width; left-hinge flips it the other way.
+    """
+    style = getattr(factory, "door_frame_style", "single_column")
+    orient = getattr(factory, "door_orientation", "right")
+    if style in {
+        "full_frame_square",
+        "full_frame_dome",
+        "full_frame_double_door",
+    }:
+        return 0.0
+    if orient == "left":
+        return -door_width / 2
+    return door_width / 2
+
+
 def split_rooms(rooms_meshed: list[bpy.types.Object]):
     extract_tags = {
         "wall": {t.Subpart.Wall, t.Subpart.Visible},
@@ -351,15 +400,17 @@ def room_floors(floors, n_floors=3, material_seed=1):
 def populate_doors(
     placeholders: list[bpy.types.Object],
     constants: RoomConstants,
-    n_doors=3,
+    state=None,
+    n_doors=1,
     door_chance=1,
     casing_chance=0.0,
     all_open=False,
     all_closed=False,
 ):
+    # One factory so every door in this scene shares style and materials.
     factories = [
         random_door_factory()(np.random.randint(1e7), constants=constants)
-        for _ in range(3)
+        for _ in range(n_doors)
     ]
 
     logger.debug(
@@ -372,13 +423,20 @@ def populate_doors(
 
     for i in trange(n_doors, desc="Placing doors"):
         factory = factories[i]
+        factory.width = constants.door_width
+        factory.height = constants.door_size
+        factory.door_frame_style = "single_column"
+        factory.door_orientation = "right"
+        factory.door_frame_width = 0.04
+        factory.shrink_width = 0.008
+        factory.depth = min(0.045, constants.wall_thickness * 0.32)
         casing_factory = factory.casing_factory
         doors, casings = [], []
         for j in np.nonzero(indices == i)[0]:
             if uniform() > door_chance:
                 continue
             if all_closed:
-                rot_z = uniform(0, 0.05)  # Completely closed
+                rot_z = 0.0
             elif all_open:
                 rot_z = uniform(0.93, 1.93)
             else:
@@ -393,12 +451,12 @@ def populate_doors(
 
             door = factory(int(j))
             door.parent = placeholders[j]
+            y_sign = _placeholder_interior_y_sign(placeholders[j], state)
             door.location = (
-                constants.door_width / 2,
-                constants.wall_thickness / 2,
+                _door_cutout_local_x(factory, constants.door_width),
+                y_sign * constants.wall_thickness / 2,
                 -constants.door_size / 2,
             )
-
             door.rotation_euler[-1] = -rot_z
             doors.append(door)
 
@@ -414,8 +472,9 @@ def populate_doors(
         butil.put_in_collection(casings, casing_col)
 
 
+@gin.configurable
 def populate_windows(
-    placeholders: list[bpy.types.Object], constants, state: state_def.State, n_windows=2
+    placeholders: list[bpy.types.Object], constants, state: state_def.State, n_windows=1
 ):
     factories = [WindowFactory(np.random.randint(1e5)) for _ in range(n_windows)]
 
@@ -660,6 +719,9 @@ def room_pillars(walls: list[bpy.types.Object], constants: RoomConstants):
                 )
                 if is_long and is_vertical and is_angled:
                     cos.append(u.co)
+        if len(cos) == 0:
+            butil.delete(interior)
+            continue
         cos = np.array(cos)
         cos += np.array(interior.location)[np.newaxis, :]
 
@@ -681,12 +743,32 @@ def room_pillars(walls: list[bpy.types.Object], constants: RoomConstants):
             )
             > constants.door_width / 2 + constants.wall_thickness
         ]
+        interior_xy = None
+        if len(interior.data.vertices):
+            ico = read_co(interior) + np.array(interior.location)
+            interior_xy = ico[:, :2].mean(axis=0)
         for co in cos:
-            obj = factory(np.random.randint(1e7))
-            obj.location = co
+            obj = factory(int(np.random.randint(1e7)))
+            factory.finalize_assets([obj])
+            loc = np.array(co, dtype=float)
+            if interior_xy is not None:
+                delta = interior_xy - loc[:2]
+                nrm = np.linalg.norm(delta)
+                if nrm > 1e-4:
+                    loc[:2] = loc[:2] + delta / nrm * (factory.width * 0.55)
+            obj.location = loc
             obj.location[-1] = (
                 room_level(wall.name) * constants.wall_height
                 + constants.wall_thickness / 2
             )
             butil.put_in_collection(obj, col)
         butil.delete(interior)
+
+
+def room_cable_trunks(walls, constants=None, ceilings=None):
+    """Full-length PVC trunking along wall–ceiling lines, branched to lights."""
+    from infinigen.assets.objects.wall_decorations.cable_trunk import (
+        install_room_cable_trunks,
+    )
+
+    install_room_cable_trunks(list(walls), ceilings=list(ceilings or []))

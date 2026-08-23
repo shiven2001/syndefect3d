@@ -340,7 +340,9 @@ def compose_indoors(output_folder: Path, scene_seed: int, **overrides):
     )
     p.run_stage(
         "room_doors",
-        lambda: room_dec.populate_doors(solver.get_bpy_objects(door_filter), constants),
+        lambda: room_dec.populate_doors(
+            solver.get_bpy_objects(door_filter), constants, state
+        ),
         use_chance=False,
     )
     p.run_stage(

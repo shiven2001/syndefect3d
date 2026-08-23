@@ -61,6 +61,11 @@ def main() -> int:
         action="store_true",
         help="Also write bboxes/, bboxes_yolo/, and annotations_coco.json (same as full preparer).",
     )
+    parser.add_argument(
+        "--realism-postprocess",
+        action="store_true",
+        help="Desaturate, brighten, and add grain to exported RGB.",
+    )
     args = parser.parse_args()
 
     input_root = args.input_folder.resolve()
@@ -121,6 +126,7 @@ def main() -> int:
         out_bboxes,
         out_bboxes_yolo,
         with_bboxes=args.with_bboxes,
+        realism_postprocess=args.realism_postprocess,
     )
     if not ok:
         return 1

@@ -23,7 +23,9 @@ def get_color():
     )
 
 
-def shader_wood(nw: NodeWrangler, color=None, w=None, vertical=False, **kwargs):
+def shader_wood(
+    nw: NodeWrangler, color=None, w=None, vertical=False, floor_finish=False, **kwargs
+):
     # Code generated using version 2.6.4 of the node_transpiler
 
     vec = nw.new_node(Nodes.TextureCoord).outputs["Object"]
@@ -176,22 +178,45 @@ def shader_wood(nw: NodeWrangler, color=None, w=None, vertical=False, **kwargs):
     )
 
     color = mix_3.outputs[2]
-    roughness = uniform(0.0, 0.4)
-    roughness = nw.build_float_curve(
-        nw.new_node(Nodes.NoiseTexture, input_kwargs={"Scale": log_uniform(40, 50)}),
-        [(0, roughness), (1, roughness + uniform(0.0, 0.8))],
-    )
+    if kwargs.get("floor_finish") or floor_finish:
+        # Satin / matte polyurethane — not wet plastic.
+        roughness = uniform(0.38, 0.52)
+        roughness = nw.build_float_curve(
+            nw.new_node(Nodes.NoiseTexture, input_kwargs={"Scale": log_uniform(22, 40)}),
+            [(0, roughness), (1, roughness + uniform(0.08, 0.20))],
+        )
+        coat = uniform(0.04, 0.14)
+        spec = uniform(0.20, 0.36)
+    else:
+        roughness = uniform(0.0, 0.4)
+        roughness = nw.build_float_curve(
+            nw.new_node(Nodes.NoiseTexture, input_kwargs={"Scale": log_uniform(40, 50)}),
+            [(0, roughness), (1, roughness + uniform(0.0, 0.8))],
+        )
+        coat = np.clip(uniform(0, 1.4), 0, 1)
+        spec = None
+    principled_kwargs = {
+        "Base Color": color,
+        "Roughness": roughness,
+        "Coat Weight": coat,
+    }
+    if spec is not None:
+        principled_kwargs["Specular IOR Level"] = spec
     principled_bsdf = nw.new_node(
         Nodes.PrincipledBSDF,
-        input_kwargs={
-            "Base Color": color,
-            "Roughness": roughness,
-            "Coat Weight": np.clip(uniform(0, 1.4), 0, 1),
-        },
+        input_kwargs=principled_kwargs,
     )
     nw.new_node(
         Nodes.MaterialOutput,
         input_kwargs={"Surface": principled_bsdf, "Displacement": displacement},
+    )
+
+
+def shader_wood_floor(nw: NodeWrangler, color=None, w=None, vertical=False, **kwargs):
+    """Interior floor boards: same grain as wood, satin (not mirror) finish."""
+    kwargs.pop("floor_finish", None)
+    shader_wood(
+        nw, color=color, w=w, vertical=vertical, floor_finish=True, **kwargs
     )
 
 
@@ -203,6 +228,52 @@ class Wood:
 
     def apply(self, obj, selection=None, **kwargs):
         common.apply(obj, shader_wood, selection, **kwargs)
+
+    __call__ = generate
+
+
+# Typical interior door / window-frame woods (oak, walnut, pine, maple, mahogany).
+_INTERIOR_WOOD_HSV = (
+    (0.075, 0.42, 0.38),  # walnut
+    (0.065, 0.48, 0.28),  # dark walnut
+    (0.082, 0.38, 0.48),  # oak
+    (0.090, 0.32, 0.58),  # light oak
+    (0.085, 0.22, 0.64),  # pine
+    (0.055, 0.50, 0.34),  # mahogany
+    (0.070, 0.18, 0.72),  # maple
+    (0.080, 0.28, 0.42),  # teak
+)
+
+
+def sample_interior_wood_color():
+    h, s, v = _INTERIOR_WOOD_HSV[int(np.random.randint(len(_INTERIOR_WOOD_HSV)))]
+    return hsv2rgba(
+        h + uniform(-0.015, 0.015),
+        float(np.clip(s + uniform(-0.08, 0.08), 0.12, 0.62)),
+        float(np.clip(v + uniform(-0.08, 0.08), 0.22, 0.82)),
+    )
+
+
+class InteriorWood:
+    """Wood shader with apartment-door color range (not random bark / plywood)."""
+
+    shader = shader_wood
+
+    def __init__(self, color=None, w=None, **kwargs):
+        self.color = color if color is not None else sample_interior_wood_color()
+        self.w = w if w is not None else uniform(0, 1)
+        self.extra = kwargs
+
+    def generate(self, **kwargs):
+        color = kwargs.pop("color", self.color)
+        w = kwargs.pop("w", self.w)
+        return surface.shaderfunc_to_material(shader_wood, color=color, w=w, **kwargs)
+
+    def apply(self, obj, selection=None, **kwargs):
+        color = kwargs.pop("color", self.color)
+        w = kwargs.pop("w", self.w)
+        kwargs.pop("metal_color", None)
+        common.apply(obj, shader_wood, selection, color=color, w=w, **kwargs)
 
     __call__ = generate
 

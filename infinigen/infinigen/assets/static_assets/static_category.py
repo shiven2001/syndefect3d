@@ -11,6 +11,9 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
+from infinigen.assets.objects.wall_decorations.split_ac import SplitACFactory
+from infinigen.assets.objects.wall_decorations.wall_faucet import WallFaucetFactory
+from infinigen.assets.objects.wall_decorations.wall_plug import WallPlugFactory
 from infinigen.assets.static_assets.base import StaticAssetFactory
 from infinigen.core.tagging import tag_support_surfaces
 from infinigen.core.util.math import FixedSeed, int_hash
@@ -217,15 +220,7 @@ StaticShelfFactory = static_category_factory(
 StaticDefectPlaneFactory = static_category_factory(
     "infinigen/assets/static_assets/source/DefectPlane", z_dim=1
 )
-StaticACFactory = static_category_factory(
-    "infinigen/assets/static_assets/source/AC",
-    z_dim=0.5,  # 40cm tall (realistic AC unit size)
-)
-StaticWallPlugFactory = static_category_factory(
-    "infinigen/assets/static_assets/source/Plugs"
-)
-
-# Faucets (wall-mounted, e.g. in bathrooms); assumes assets are under source/Faucets
-StaticFaucetFactory = static_category_factory(
-    "infinigen/assets/static_assets/source/Faucets"
-)
+# Procedural replacements for the old mesh importers under source/AC, Plugs, Faucets.
+StaticACFactory = SplitACFactory
+StaticWallPlugFactory = WallPlugFactory
+StaticFaucetFactory = WallFaucetFactory

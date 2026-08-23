@@ -25,16 +25,21 @@ from infinigen.assets.objects import (
 )
 
 from infinigen.assets import static_assets
-from infinigen.assets.crack_plane import CrackPlaneFactory
-from infinigen.assets.paint_peel_plane import PaintPeelPlaneFactory
-
-from infinigen.assets.spalling_plane import (
-    SpallingPlaneFactory,
-    SpallingPlugPlaneFactory,
+from infinigen.assets.crack_plane import CeilingCrackPlaneFactory, CrackPlaneFactory
+from infinigen.assets.paint_peel_plane import (
+    CeilingPeelFactory,
+    PaintPeelPlaneFactory,
 )
+
+# from infinigen.assets.spalling_plane import (
+#     SpallingPlaneFactory,
+#     SpallingPlugPlaneFactory,
+# )  # commented out
+from infinigen.assets.paint_patch_plane import PaintPatchPlaneFactory
+from infinigen.assets.paint_run_plane import PaintRunPlaneFactory
 from infinigen.assets.wall_bubble_plane import WallBubblePlaneFactory
 # from infinigen.assets.weak_leak_stain_plane import WeakLeakStainPlaneFactory  # commented out
-from infinigen.assets.open_wiring_plane import OpenWiringPlaneFactory
+# from infinigen.assets.open_wiring_plane import OpenWiringPlaneFactory  # commented out
 from infinigen.core.constraints import constraint_language as cl
 from infinigen.core.constraints import usage_lookup
 from infinigen.core.constraints.constraint_language.constants import RoomConstants
@@ -492,8 +497,12 @@ def home_room_constraints(has_fewer_rooms=False):
 def home_furniture_constraints(
     crack_count_min: int = 5,
     crack_count_max: int = 10,
+    crack_ceiling_count_min: int = 1,
+    crack_ceiling_count_max: int = 4,
     paint_peel_count_min: int = 5,
     paint_peel_count_max: int = 10,
+    paint_peel_ceiling_count_min: int = 1,
+    paint_peel_ceiling_count_max: int = 3,
     spalling_count_min: int = 2,
     spalling_count_max: int = 4,
     spalling_plug_count_min: int = 1,
@@ -656,20 +665,27 @@ def home_furniture_constraints(
     walldec = obj[Semantics.WallDecoration].related_to(rooms, cu.flush_wall)
     wall_art = walldec[wall_decorations.WallArtFactory]
     mirror = walldec[wall_decorations.MirrorFactory]
-    ac_units = walldec[static_assets.StaticACFactory]
-    wall_plugs = walldec[static_assets.StaticWallPlugFactory]
-    faucets = walldec[static_assets.StaticFaucetFactory]
+    ac_units = walldec[wall_decorations.SplitACFactory]
+    wall_plugs = walldec[wall_decorations.WallPlugFactory]
+    faucets = walldec[wall_decorations.WallFaucetFactory]
+    # Cable trunks are spawned from wall/ceiling geometry after solve
+    # (see room_cable_trunks), not by the furniture solver.
 
     # Defects - separate category (walls only), each type has its own constraints
     defects = obj[Semantics.Defects]
     defects_wall = defects.related_to(rooms, cu.flush_wall_defect)
+    defects_ceiling = defects.related_to(rooms, cu.flush_ceiling_defect)
     cracks_wall = defects_wall[CrackPlaneFactory]
+    cracks_ceiling = defects_ceiling[CeilingCrackPlaneFactory]
     paint_peel_wall = defects_wall[PaintPeelPlaneFactory]
-    spalling_wall = defects_wall[SpallingPlaneFactory]
-    spalling_plug_wall = defects_wall[SpallingPlugPlaneFactory]
+    paint_peel_ceiling = defects_ceiling[CeilingPeelFactory]
+    # spalling_wall = defects_wall[SpallingPlaneFactory]  # commented out
+    # spalling_plug_wall = defects_wall[SpallingPlugPlaneFactory]  # commented out
     wall_bubble_wall = defects_wall[WallBubblePlaneFactory]
+    paint_run_wall = defects_wall[PaintRunPlaneFactory]
+    paint_patch_wall = defects_wall[PaintPatchPlaneFactory]
     # weak_leak_stain_wall = defects_wall[WeakLeakStainPlaneFactory]  # commented out
-    open_wiring_wall = defects_wall[OpenWiringPlaneFactory]
+    # open_wiring_wall = defects_wall[OpenWiringPlaneFactory]  # commented out
 
     rugs = obj[elements.RugFactory].related_to(rooms, cu.on_floor)
 
@@ -703,7 +719,7 @@ def home_furniture_constraints(
             ac_units.related_to(r).count().in_range(1, 1)
             * ac_units.related_to(r).all(
                 lambda t: (
-                    (t.distance(r, cu.floortags).in_range(2.6, 2.7))
+                    (t.distance(r, cu.floortags).in_range(2.40, 2.55))
                     * (t.distance(cutters) > 1.0)
                 )
             )
@@ -737,7 +753,7 @@ def home_furniture_constraints(
         )
     )
 
-    # Cracks: hairline cracks, can appear anywhere on walls
+    # Cracks: same class on walls and ceilings (hairline + occasional wide).
     constraints["cracks"] = rooms.all(
         lambda r: (
             cracks_wall.related_to(r).count().in_range(crack_count_min, crack_count_max)
@@ -746,9 +762,18 @@ def home_furniture_constraints(
                     (vertical_diff(t, r).abs() < 1.5) * (t.distance(cutters) > 0.30)
                 )
             )
+            * cracks_ceiling.related_to(r)
+            .count()
+            .in_range(crack_ceiling_count_min, crack_ceiling_count_max)
+            * cracks_ceiling.related_to(r).all(
+                lambda t: (
+                    (t.distance(r, cu.ceilingtags).in_range(0.0, 0.02))
+                    * (t.distance(cutters) > 0.30)
+                )
+            )
         )
     )
-    # Paint peel: paint flaking, often in corners or moisture areas
+    # Paint peel: walls and ceilings share the same exposed-substrate tint.
     constraints["paint_peel"] = rooms.all(
         lambda r: (
             paint_peel_wall.related_to(r)
@@ -759,32 +784,65 @@ def home_furniture_constraints(
                     (vertical_diff(t, r).abs() < 1.5) * (t.distance(cutters) > 0.30)
                 )
             )
-        )
-    )
-    # Spalling: same placement logic as wall plugs (height 0.2-0.6m from floor, clearance from cutters)
-    constraints["spalling"] = rooms.all(
-        lambda r: (
-            spalling_wall.related_to(r)
+            * paint_peel_ceiling.related_to(r)
             .count()
-            .in_range(spalling_count_min, spalling_count_max)
-            * spalling_wall.related_to(r).all(
+            .in_range(paint_peel_ceiling_count_min, paint_peel_ceiling_count_max)
+            * paint_peel_ceiling.related_to(r).all(
                 lambda t: (
-                    (t.distance(r, cu.floortags).in_range(0.2, 0.6))
-                    * (t.distance(cutters) > 0.1)
+                    (t.distance(r, cu.ceilingtags).in_range(0.0, 0.02))
+                    * (t.distance(cutters) > 0.30)
                 )
             )
         )
     )
-    # Spalling at wall plugs: placed like wall plugs, then finalize_assets snaps to plug locations
-    constraints["spalling_plug"] = rooms.all(
+    # Spalling (commented out):
+    # constraints["spalling"] = rooms.all(
+    #     lambda r: (
+    #         spalling_wall.related_to(r)
+    #         .count()
+    #         .in_range(spalling_count_min, spalling_count_max)
+    #         * spalling_wall.related_to(r).all(
+    #             lambda t: (
+    #                 (t.distance(r, cu.floortags).in_range(0.2, 0.6))
+    #                 * (t.distance(cutters) > 0.1)
+    #             )
+    #         )
+    #     )
+    # )
+    # Spalling at wall plugs (commented out):
+    # constraints["spalling_plug"] = rooms.all(
+    #     lambda r: (
+    #         spalling_plug_wall.related_to(r)
+    #         .count()
+    #         .in_range(spalling_plug_count_min, spalling_plug_count_max)
+    #         * spalling_plug_wall.related_to(r).all(
+    #             lambda t: (
+    #                 (t.distance(r, cu.floortags).in_range(0.2, 0.6))
+    #                 * (t.distance(cutters) > 0.1)
+    #             )
+    #         )
+    #     )
+    # )
+
+    # Paint patchiness: uneven finish / touch-up mismatch (mid-wall, like bubbles)
+    constraints["paint_patches"] = rooms.all(
         lambda r: (
-            spalling_plug_wall.related_to(r)
-            .count()
-            .in_range(spalling_plug_count_min, spalling_plug_count_max)
-            * spalling_plug_wall.related_to(r).all(
+            paint_patch_wall.related_to(r).count().in_range(2, 4)
+            * paint_patch_wall.all(
                 lambda t: (
-                    (t.distance(r, cu.floortags).in_range(0.2, 0.6))
-                    * (t.distance(cutters) > 0.1)
+                    (vertical_diff(t, r).abs() < 1.5) * (t.distance(cutters) > 0.30)
+                )
+            )
+        )
+    )
+
+    # Paint runs: 1–2 small vertical drips per instance (same mid-wall band as bubbles)
+    constraints["paint_runs"] = rooms.all(
+        lambda r: (
+            paint_run_wall.related_to(r).count().in_range(2, 4)
+            * paint_run_wall.all(
+                lambda t: (
+                    (vertical_diff(t, r).abs() < 1.5) * (t.distance(cutters) > 0.30)
                 )
             )
         )
@@ -803,19 +861,19 @@ def home_furniture_constraints(
         )
     )
 
-    # Open wiring: exposed wires at wall (similar placement to wall plugs)
-    constraints["open_wiring"] = rooms.all(
-        lambda r: (
-            open_wiring_wall.related_to(r)
-            .count()
-            .in_range(open_wiring_count_min, open_wiring_count_max)
-            * open_wiring_wall.all(
-                lambda t: (
-                    (vertical_diff(t, r).abs() < 1.5) * (t.distance(cutters) > 0.30)
-                )
-            )
-        )
-    )
+    # Open wiring / exposed wiring (commented out):
+    # constraints["open_wiring"] = rooms.all(
+    #     lambda r: (
+    #         open_wiring_wall.related_to(r)
+    #         .count()
+    #         .in_range(open_wiring_count_min, open_wiring_count_max)
+    #         * open_wiring_wall.all(
+    #             lambda t: (
+    #                 (vertical_diff(t, r).abs() < 1.5) * (t.distance(cutters) > 0.30)
+    #             )
+    #         )
+    #     )
+    # )
 
     # Weak leak stain generation (commented out):
     # constraints["weak_leak_stain"] = rooms.all(
@@ -844,6 +902,39 @@ def home_furniture_constraints(
     #     )
     # )
 
+    score_terms["paint_patches"] = rooms.mean(
+        lambda r: (
+            paint_patch_wall.related_to(r).mean(
+                lambda d: (
+                    vertical_diff(d, r).abs().minimize(weight=1)
+                    + d.distance(paint_patch_wall).maximize(weight=1)
+                    + d.distance(paint_run_wall).maximize(weight=0.8)
+                    + d.distance(wall_bubble_wall).maximize(weight=0.8)
+                    + d.distance(window).hinge(0.25, 10).maximize(weight=1)
+                    + cl.angle_alignment_cost(d, r, cu.floortags).minimize(weight=5)
+                    + cl.accessibility_cost(d, furniture, dist=1).minimize(weight=5)
+                    + cl.center_stable_surface_dist(d).minimize(weight=1)
+                )
+            )
+        )
+    )
+
+    score_terms["paint_runs"] = rooms.mean(
+        lambda r: (
+            paint_run_wall.related_to(r).mean(
+                lambda d: (
+                    vertical_diff(d, r).abs().minimize(weight=1)
+                    + d.distance(paint_run_wall).maximize(weight=1)
+                    + d.distance(wall_bubble_wall).maximize(weight=0.8)
+                    + d.distance(window).hinge(0.25, 10).maximize(weight=1)
+                    + cl.angle_alignment_cost(d, r, cu.floortags).minimize(weight=5)
+                    + cl.accessibility_cost(d, furniture, dist=1).minimize(weight=5)
+                    + cl.center_stable_surface_dist(d).minimize(weight=1)
+                )
+            )
+        )
+    )
+
     score_terms["wall_bubbles"] = rooms.mean(
         lambda r: (
             wall_bubble_wall.related_to(r).mean(
@@ -859,20 +950,20 @@ def home_furniture_constraints(
         )
     )
 
-    score_terms["open_wiring"] = rooms.mean(
-        lambda r: (
-            open_wiring_wall.related_to(r).mean(
-                lambda d: (
-                    vertical_diff(d, r).abs().minimize(weight=1)
-                    + d.distance(open_wiring_wall).maximize(weight=1)
-                    + d.distance(window).hinge(0.25, 10).maximize(weight=1)
-                    + cl.angle_alignment_cost(d, r, cu.floortags).minimize(weight=5)
-                    + cl.accessibility_cost(d, furniture, dist=1).minimize(weight=5)
-                    + cl.center_stable_surface_dist(d).minimize(weight=1)
-                )
-            )
-        )
-    )
+    # score_terms["open_wiring"] = rooms.mean(
+    #     lambda r: (
+    #         open_wiring_wall.related_to(r).mean(
+    #             lambda d: (
+    #                 vertical_diff(d, r).abs().minimize(weight=1)
+    #                 + d.distance(open_wiring_wall).maximize(weight=1)
+    #                 + d.distance(window).hinge(0.25, 10).maximize(weight=1)
+    #                 + cl.angle_alignment_cost(d, r, cu.floortags).minimize(weight=5)
+    #                 + cl.accessibility_cost(d, furniture, dist=1).minimize(weight=5)
+    #                 + cl.center_stable_surface_dist(d).minimize(weight=1)
+    #             )
+    #         )
+    #     )
+    # )
 
     score_terms["wall_decorations"] = rooms.mean(
         lambda r: (
@@ -919,7 +1010,7 @@ def home_furniture_constraints(
         )
     )
 
-    # Cracks: spread out, avoid windows, align to wall
+    # Cracks: spread out, avoid windows, align to wall / sit on ceiling
     score_terms["cracks"] = rooms.mean(
         lambda r: (
             cracks_wall.related_to(r).mean(
@@ -932,9 +1023,17 @@ def home_furniture_constraints(
                     + cl.center_stable_surface_dist(d).minimize(weight=1)
                 )
             )
+            + cracks_ceiling.related_to(r).mean(
+                lambda d: (
+                    d.distance(r, cu.ceilingtags).minimize(weight=10)
+                    + d.distance(cracks_ceiling).maximize(weight=1)
+                    + d.distance(cracks_wall).maximize(weight=0.4)
+                    + cl.center_stable_surface_dist(d).minimize(weight=1)
+                )
+            )
         )
     )
-    # Paint peel: spread out, avoid windows
+    # Paint peel: spread out on walls; sit on the ceiling like ceiling cracks
     score_terms["paint_peel"] = rooms.mean(
         lambda r: (
             paint_peel_wall.related_to(r).mean(
@@ -947,28 +1046,35 @@ def home_furniture_constraints(
                     + cl.center_stable_surface_dist(d).minimize(weight=1)
                 )
             )
-        )
-    )
-    # Spalling: same scoring as wall plugs
-    score_terms["spalling"] = rooms.mean(
-        lambda r: (
-            spalling_wall.related_to(r).mean(
+            + paint_peel_ceiling.related_to(r).mean(
                 lambda d: (
-                    d.distance(spalling_wall.related_to(r)).maximize(weight=1.5)
-                    + d.distance(doors).hinge(0.3, 10).maximize(weight=2)
-                    + cl.angle_alignment_cost(d, r, cu.floortags).minimize(weight=5)
-                    + cl.accessibility_cost(d, furniture, dist=0.3).minimize(weight=3)
+                    d.distance(r, cu.ceilingtags).minimize(weight=10)
+                    + d.distance(paint_peel_ceiling).maximize(weight=1)
+                    + d.distance(paint_peel_wall).maximize(weight=0.4)
+                    + cl.center_stable_surface_dist(d).minimize(weight=1)
                 )
             )
         )
     )
-    # Spalling at wall plugs: pull placeholders toward wall plugs (minimize distance)
-    # so solver places them at plug locations before finalize_assets snaps them
-    score_terms["spalling_plug"] = rooms.mean(
-        lambda r: spalling_plug_wall.related_to(r).mean(
-            lambda s: s.distance(wall_plugs.related_to(r)).minimize(weight=200)
-        )
-    )
+    # Spalling (commented out):
+    # score_terms["spalling"] = rooms.mean(
+    #     lambda r: (
+    #         spalling_wall.related_to(r).mean(
+    #             lambda d: (
+    #                 d.distance(spalling_wall.related_to(r)).maximize(weight=1.5)
+    #                 + d.distance(doors).hinge(0.3, 10).maximize(weight=2)
+    #                 + cl.angle_alignment_cost(d, r, cu.floortags).minimize(weight=5)
+    #                 + cl.accessibility_cost(d, furniture, dist=0.3).minimize(weight=3)
+    #             )
+    #         )
+    #     )
+    # )
+    # Spalling at wall plugs (commented out):
+    # score_terms["spalling_plug"] = rooms.mean(
+    #     lambda r: spalling_plug_wall.related_to(r).mean(
+    #         lambda s: s.distance(wall_plugs.related_to(r)).minimize(weight=200)
+    #     )
+    # )
 
     score_terms["floor_covering"] = rugs.mean(
         lambda rug: (

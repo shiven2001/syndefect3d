@@ -19,6 +19,8 @@ Maps defect materials to classes:
   - 3: SpallingMaterial_* and SpallingPlugMaterial_* (same class as spalling)
   - 4: BubbleMaterial_*
   - 5: OpenWiringMaterial_*
+  - 6: PaintRunMaterial_*
+  - 7: PaintPatchMaterial_*
 
 Outputs (default: segmentation pack only):
   - out_dir/images/<id>.png  (RGB)
@@ -57,6 +59,8 @@ CLASS_PAINT_PEEL = 2
 CLASS_SPALLING = 3
 CLASS_PAINT_BUBBLE = 4
 CLASS_EXPOSED_WIRING = 5
+CLASS_PAINT_RUN = 6
+CLASS_PAINT_PATCH = 7
 
 DEFECT_PREFIXES = {
     "CrackMaterial": CLASS_CRACK,
@@ -66,6 +70,8 @@ DEFECT_PREFIXES = {
     "SpallingMaterial": CLASS_SPALLING,
     "BubbleMaterial": CLASS_PAINT_BUBBLE,
     "OpenWiringMaterial": CLASS_EXPOSED_WIRING,
+    "PaintRunMaterial": CLASS_PAINT_RUN,
+    "PaintPatchMaterial": CLASS_PAINT_PATCH,
 }
 
 CLASS_NAMES = {
@@ -75,9 +81,11 @@ CLASS_NAMES = {
     CLASS_SPALLING: "spalling",
     CLASS_PAINT_BUBBLE: "paint_bubble",
     CLASS_EXPOSED_WIRING: "exposed_wiring",
+    CLASS_PAINT_RUN: "paint_run",
+    CLASS_PAINT_PATCH: "paint_patch",
 }
 
-NUM_CLASSES = 1 + max(DEFECT_PREFIXES.values())  # background 0 + defects 1..5 -> 6 classes
+NUM_CLASSES = 1 + max(DEFECT_PREFIXES.values())  # background 0 + defects 1..7 -> 8 classes
 # PNG mask grayscale: class k -> k * step (step=36 for 6 classes). Keeps levels under legacy 85/170/255.
 MASK_GRAY_STEP = max(1, 180 // (NUM_CLASSES - 1))
 
@@ -307,6 +315,24 @@ def _discover_in_frames(
     return results
 
 
+def realism_postprocess_rgb(
+    rgb: np.ndarray,
+    saturation_scale: float = 0.35,
+    brightness_scale: float = 1.15,
+    noise_sigma: float = 4.0,
+) -> np.ndarray:
+    """Desaturate, brighten, and add film grain to match phone-photo statistics."""
+    img = rgb.astype(np.float32)
+    if img.max() <= 1.0:
+        img = img * 255.0
+    gray = img.mean(axis=-1, keepdims=True)
+    out = gray + (img - gray) * saturation_scale
+    out = np.clip(out * brightness_scale, 0.0, 255.0)
+    rng = np.random.default_rng()
+    out = np.clip(out + rng.normal(0.0, noise_sigma, out.shape), 0.0, 255.0)
+    return out.round().astype(np.uint8)
+
+
 def process_sample(
     image_path: Path,
     npy_path: Path,
@@ -317,6 +343,10 @@ def process_sample(
     out_bboxes: Path,
     out_bboxes_yolo: Path,
     with_bboxes: bool = False,
+    realism_postprocess: bool = False,
+    saturation_scale: float = 0.35,
+    brightness_scale: float = 1.15,
+    noise_sigma: float = 4.0,
 ) -> bool:
     """Load RGB + material data, build label map, save image, mask, and optionally bboxes."""
     try:
@@ -325,6 +355,13 @@ def process_sample(
             rgb = np.stack([rgb] * 3, axis=-1)
         elif rgb.shape[-1] == 4:
             rgb = rgb[..., :3]
+        if realism_postprocess:
+            rgb = realism_postprocess_rgb(
+                rgb,
+                saturation_scale=saturation_scale,
+                brightness_scale=brightness_scale,
+                noise_sigma=noise_sigma,
+            )
 
         index_map = np.load(npy_path)
         if index_map.ndim == 3:
@@ -410,6 +447,8 @@ def write_class_names_legend(output_dir: Path) -> Path:
         "3 spalling\n"
         "4 paint_bubble\n"
         "5 exposed_wiring\n"
+        "6 paint_run\n"
+        "7 paint_patch\n"
         f"# Mask PNG: gray level = class_id * {MASK_GRAY_STEP} (class 0..{NUM_CLASSES - 1})\n"
         f"# Decode: label = ((mask + {half}) // {MASK_GRAY_STEP}).clip(0, {NUM_CLASSES - 1})\n"
         "# Legacy 4-class masks only use {0,85,170,255}: label = (mask // 85).clip(0,3)\n"
@@ -483,6 +522,32 @@ def main():
         action="store_true",
         help="Disable tqdm progress bar (e.g. for logs).",
     )
+    parser.add_argument(
+        "--realism-postprocess",
+        action="store_true",
+        help=(
+            "Desaturate, brighten, and add grain to exported RGB "
+            "(fast ablation without re-rendering; see REALISM_IMPROVEMENTS.md)."
+        ),
+    )
+    parser.add_argument(
+        "--saturation-scale",
+        type=float,
+        default=0.35,
+        help="HSV saturation multiplier when using --realism-postprocess (default: 0.35).",
+    )
+    parser.add_argument(
+        "--brightness-scale",
+        type=float,
+        default=1.15,
+        help="Value multiplier when using --realism-postprocess (default: 1.15).",
+    )
+    parser.add_argument(
+        "--noise-sigma",
+        type=float,
+        default=4.0,
+        help="Gaussian grain sigma in 0–255 units when using --realism-postprocess (default: 4).",
+    )
     args = parser.parse_args()
 
     input_root = args.input_folder.resolve()
@@ -539,6 +604,10 @@ def main():
                     out_bboxes,
                     out_bboxes_yolo,
                     with_bboxes=args.with_bboxes,
+                    realism_postprocess=args.realism_postprocess,
+                    saturation_scale=args.saturation_scale,
+                    brightness_scale=args.brightness_scale,
+                    noise_sigma=args.noise_sigma,
                 ):
                     success += 1
             print(

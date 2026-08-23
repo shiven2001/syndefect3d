@@ -20,7 +20,7 @@ compose_indoors.skirting_floor_chance = 0.5
 compose_indoors.skirting_ceiling_chance = 0.5
 
 # Door settings - make ALL doors completely closed
-# populate_doors.all_closed = True
+populate_doors.all_closed = True
 populate_doors.door_chance = 1.0
 
 # Fast solve

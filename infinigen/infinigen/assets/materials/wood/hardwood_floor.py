@@ -33,7 +33,7 @@ def shader_hardwood_floor(nw: NodeWrangler, rotation=None):
         ["Color", "Fac"],
     )
     location = nw.combine(color, color, color)
-    shader_wood(nw)
+    shader_wood(nw, floor_finish=True)
     surface_utils.perturb_coordinates(nw, nw.find(Nodes.TextureCoord)[1], location, 0)
     principled_bsdf = nw.find(Nodes.PrincipledBSDF)[0]
     wood_color = nw.find_from(principled_bsdf.inputs[0])[0].from_socket
