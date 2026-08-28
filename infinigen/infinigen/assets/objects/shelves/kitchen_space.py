@@ -5,9 +5,10 @@
 
 import bpy
 from mathutils import Vector
-from numpy.random import choice, uniform
+from numpy.random import uniform
 
 from infinigen.assets.materials.ceramic.marble import shader_marble
+from infinigen.assets.objects.appliances.cooktop import CooktopFactory
 from infinigen.assets.objects.shelves.kitchen_cabinet import KitchenCabinetFactory
 from infinigen.assets.objects.tables.table_top import nodegroup_generate_table_top
 from infinigen.assets.objects.wall_decorations.range_hood import RangeHoodFactory
@@ -270,36 +271,18 @@ class KitchenSpaceFactory(AssetFactory):
                 z - cabinet_top_height,
             )
 
-            # hood / cab
-            # mid_style = choice(['range_hood', 'cabinet'])
-            # mid_style = 'range_hood'
-            mid_style = choice(["cabinet"])
-            if mid_style == "range_hood":
-                range_hood_factory = RangeHoodFactory(
-                    self.factory_seed,
-                    dimensions=(x * 0.66, top_mid_width + 0.15, cabinet_top_height),
-                )
-                top_mid = range_hood_factory(i=0)
-                top_mid.location = (-x * 0.5, y / 2.0, z - cabinet_top_height + 0.05)
+            range_hood_factory = RangeHoodFactory(
+                self.factory_seed,
+                dimensions=(x * 0.66, top_mid_width + 0.15, cabinet_top_height),
+            )
+            top_mid = range_hood_factory(i=0)
+            range_hood_factory.finalize_assets([top_mid])
+            top_mid.location = (-x * 0.5, y / 2.0, z - cabinet_top_height + 0.05)
 
-            elif mid_style == "cabinet":
-                cabinet_top_mid_factory = KitchenCabinetFactory(
-                    self.factory_seed,
-                    dimensions=(x * 0.66, top_mid_width, cabinet_top_height * 0.8),
-                    drawer_only=False,
-                )
-                top_mid = cabinet_top_mid_factory(i=0)
-                top_mid.location = (
-                    -x / 6.0,
-                    y / 2.0 - top_mid_width / 2.0,
-                    z - (cabinet_top_height * 0.8),
-                )
+            hob = CooktopFactory(self.factory_seed).spawn_asset(0)
+            hob.location = (0.0, y / 2.0, cabinet_bottom_height + 0.05)
 
-            else:
-                raise NotImplementedError
-
-            # parts += [sink, cabinet_top_left, cabinet_top_right, top_mid]
-            parts += [cabinet_top_left, cabinet_top_right, top_mid]
+            parts += [cabinet_top_left, cabinet_top_right, top_mid, hob]
 
         kitchen_space = butil.join_objects(
             parts

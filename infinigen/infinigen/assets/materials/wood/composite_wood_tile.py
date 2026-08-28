@@ -11,6 +11,6 @@ from .wood import shader_wood_floor
 class CompositeWoodTile:
     def generate(self):
         shader_func = shader_wood_floor
-        return tile.Tile().generate(shader_func, "composite")
+        return tile.Tile().generate(shader_func=shader_func, shape="composite")
 
     __call__ = generate

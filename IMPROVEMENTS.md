@@ -461,3 +461,12 @@ Focus instead on: **framing, saturation, contrast, defect morphology, background
 - Re-coarse is required for new camera rigs (`add_defect_focus`); re-render alone only changes lighting/materials per `rs`.
 - Full re-render of 250 scenes × 50 rigs × 5 rs is expensive — always pilot on 3–10 scenes first.
 - Document changes as **SynDefect3D v2** in thesis with before/after metrics.
+
+----
+
+Treat realism as done when all of this is true:
+
+Rooms look like handover interiors (walls, ceiling, floor, openings, basic fixtures).
+Lighting includes shadows at ceiling–wall junctions, not only even studio light.
+Defects you care about are in the label set (crack, peel/blister, run, patchiness, stain).
+You have a held-out test split that you will not train on again.

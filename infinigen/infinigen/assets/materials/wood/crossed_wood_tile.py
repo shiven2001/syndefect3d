@@ -11,7 +11,7 @@ from .wood import shader_wood_floor
 class CrossedWoodTile:
     def generate(self):
         shader_func = shader_wood_floor
-        return tile.Tile().generate(shader_func, "crossed")
+        return tile.Tile().generate(shader_func=shader_func, shape="crossed")
 
     __call__ = generate
     # def make_sphere():e

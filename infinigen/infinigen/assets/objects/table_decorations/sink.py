@@ -13,6 +13,7 @@ import numpy as np
 from numpy.random import uniform as U
 
 from infinigen.assets.composition import material_assignments
+from infinigen.assets.objects.table_decorations.kitchen_mixer import KitchenMixerFactory
 from infinigen.assets.utils import bbox_from_mesh
 from infinigen.assets.utils.extract_nodegroup_parts import extract_nodegroup_geo
 from infinigen.core import tagging
@@ -40,7 +41,7 @@ class SinkFactory(AssetFactory):
             # TODO sink_color = colors.metal_natural_hsv()
         self.params.update(self.material_params)
 
-        self.tap_factory = TapFactory(factory_seed)
+        self.tap_factory = KitchenMixerFactory(factory_seed)
 
     def get_material_params(self):
         params = {

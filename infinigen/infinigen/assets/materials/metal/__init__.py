@@ -17,5 +17,5 @@ from .brushed_metal import BrushedMetal
 from .galvanized_metal import GalvanizedMetal
 from .grained_and_polished_metal import GrainedMetal
 from .hammered_metal import HammeredMetal
-from .metal_basic import MetalBasic
+from .metal_basic import MetalBasic, WindowFrameMetal
 from .mirror import Mirror

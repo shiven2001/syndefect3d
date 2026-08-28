@@ -1,6 +1,6 @@
 # Minimal Kitchen Configuration
-# Spawns: Kitchen Counters and Sink ONLY (NO appliances like fridge/dishwasher)
-# Note: Cabinets are built-in to KitchenSpaceFactory, not separate objects
+# Spawns: counters (with hob + range hood), sink + deck mixer
+# NO fridge / oven / dishwasher / counter clutter
 
 # Use single room configuration
 BlueprintSolidifier.enable_open=False
@@ -13,24 +13,24 @@ restrict_solving.restrict_parent_rooms=["Kitchen"]
 # Instead, we filter the constraint graph to only kitchen counter constraints
 
 # Filter constraint graph to ONLY kitchen counter/island/sink constraints
-# This removes kitchen_appliance and kitchen_barchairs constraints
-# Keeps: kitchen_counters, kitchen_island_placement, kitchen_sink, kitchen_objects
-# Also keeps: defects (for defect planes - now in separate category), AC, and wall plugs
-restrict_solving.consgraph_filters=["kitchen_counter", "kitchen_island", "kitchen_sink", "kitchen_objects", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ceiling_lights", "ac_units", "wall_plugs"]
+# This removes kitchen_appliance, kitchen_barchairs, and counter clutter
+# Keeps: kitchen_counters, kitchen_island_placement, kitchen_sink
+# Also keeps: defects, AC, wall plugs, light switches
+restrict_solving.consgraph_filters=["kitchen_counter", "kitchen_island", "kitchen_sink", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ceiling_lights", "ac_units", "wall_plugs", "light_switches"]
 
 # Disable terrain and other features
 compose_indoors.terrain_enabled = False
 compose_indoors.hide_other_rooms_enabled = True
 
 # Disable solving stages we don't need
-compose_indoors.solve_small_enabled = False
+compose_indoors.solve_small_enabled = True   # Kitchen sink + mixer on the counter
 compose_indoors.solve_medium_enabled = True   # Enable for wall decorations (defect planes)
 compose_indoors.solve_large_enabled = True
 
 # Extras
 compose_indoors.lights_off_chance = 0.0
-compose_indoors.skirting_floor_chance = 0.5
-compose_indoors.skirting_ceiling_chance = 0.5
+compose_indoors.skirting_floor_chance = 1.0
+compose_indoors.skirting_ceiling_chance = 0.3
 
 # Door settings - make ALL doors completely closed
 populate_doors.all_closed = True

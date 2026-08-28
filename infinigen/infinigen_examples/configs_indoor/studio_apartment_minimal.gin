@@ -7,7 +7,7 @@
 # Per room (via consgraph_filters):
 #   Living / bedroom / dining — shell + defects + ceiling lights + AC + wall plugs only
 #   Kitchen — counters, island, sink + built-ins (no appliances / bar chairs)
-#   Bathroom — toilet, sink, mirror, bathtub + faucets (no shelves / clutter)
+#   Bathroom — toilet, sink, mirror, bathtub, shower, vanity, exhaust, drain, TP, medicine + faucets
 
 # Compact floor plan (same as studio.gin / fast_solve.gin)
 home_room_constraints.has_fewer_rooms = True
@@ -23,9 +23,9 @@ compose_indoors.terrain_enabled = False
 compose_indoors.hide_other_rooms_enabled = False
 
 # Union of per-room minimal consgraph filters (substring match on constraint keys)
-restrict_solving.consgraph_filters=["ceiling_lights", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ac_units", "wall_plugs", "faucets", "kitchen_counter", "kitchen_island", "kitchen_sink", "kitchen_objects", "bathroom", "toilet", "bathtub"]
+restrict_solving.consgraph_filters=["ceiling_lights", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ac_units", "wall_plugs", "light_switches", "faucets", "kitchen_counter", "kitchen_island", "kitchen_sink", "bathroom", "toilet", "bathtub", "showers", "vanities", "exhaust_fans", "floor_drains", "medicine_cabinets", "toilet_paper"]
 
-compose_indoors.solve_small_enabled = False
+compose_indoors.solve_small_enabled = True
 compose_indoors.solve_medium_enabled = True
 compose_indoors.solve_large_enabled = True
 

@@ -12,6 +12,6 @@ from .wood import shader_wood_floor
 class StaggeredWoodTile:
     def generate(self):
         shader_func = shader_wood_floor
-        return tile.Tile().generate(shader_func, "staggered")
+        return tile.Tile().generate(shader_func=shader_func, shape="staggered")
 
     __call__ = generate

@@ -197,6 +197,8 @@ def home_asset_usage():
             bathroom.StandingSinkFactory,
             bathroom.ToiletFactory,
             bathroom.BathtubFactory,
+            bathroom.ShowerStallFactory,
+            bathroom.VanityCabinetFactory,
             seating.SofaFactory,
             static_assets.StaticSofaFactory,
             shelves.TVStandFactory,
@@ -213,6 +215,9 @@ def home_asset_usage():
         wall_decorations.WallPlugFactory,
         wall_decorations.WallFaucetFactory,
         wall_decorations.WallCableTrunkFactory,
+        bathroom.MedicineCabinetFactory,
+        bathroom.ToiletPaperHolderFactory,
+        wall_decorations.WallSwitchFactory,
     }
 
     used_as[Semantics.Defects] = {
@@ -268,6 +273,8 @@ def home_asset_usage():
             appliances.MonitorFactory,
             elements.RugFactory,
             bathroom.HardwareFactory,
+            bathroom.ExhaustFanFactory,
+            bathroom.FloorDrainFactory,
             wall_decorations.CeilingCableTrunkFactory,
         },
     )
@@ -358,12 +365,15 @@ def home_asset_usage():
         {
             bathroom.HardwareFactory,
             lamp.CeilingLightFactory,  # rotationally symetric
+            bathroom.ExhaustFanFactory,
+            bathroom.FloorDrainFactory,
             wall_decorations.CeilingCableTrunkFactory,
         },
     )
 
     used_as[Semantics.NoCollision] = {
         elements.RugFactory,
+        bathroom.FloorDrainFactory,
     }
 
     used_as[Semantics.NoChildren] = {
@@ -371,6 +381,11 @@ def home_asset_usage():
         wall_decorations.MirrorFactory,
         wall_decorations.WallArtFactory,
         lamp.CeilingLightFactory,
+        bathroom.ExhaustFanFactory,
+        bathroom.FloorDrainFactory,
+        bathroom.ToiletPaperHolderFactory,
+        bathroom.MedicineCabinetFactory,
+        wall_decorations.WallSwitchFactory,
     }
 
     # endregion

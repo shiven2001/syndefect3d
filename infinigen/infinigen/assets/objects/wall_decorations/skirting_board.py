@@ -6,6 +6,7 @@
 import logging
 
 import bpy
+from mathutils import Vector
 import numpy as np
 import shapely
 from numpy.random import randint, uniform
@@ -15,6 +16,10 @@ from shapely.ops import unary_union
 import infinigen.core.util.blender as butil
 from infinigen.assets import colors
 from infinigen.assets.materials.plastic import plastic_rough
+from infinigen.assets.materials.wood.wood import (
+    sample_interior_wood_color,
+    shader_wood,
+)
 from infinigen.assets.utils.decorate import (
     read_co,
 )
@@ -185,8 +190,13 @@ def apply_skirtingboard(
     with FixedSeed(seed):
         thickness = uniform(0.02, 0.05)
         height = uniform(0.08, 0.15)
-        color = hsv2rgba(colors.white_hsv())
-        roughness = uniform(0.5, 1.0)
+        # Cornices are painted with the ceiling; floor skirting in these flats is
+        # usually stained to match the door architraves, and only sometimes white.
+        stained = (not is_ceiling) and uniform() < 0.75
+        color = (
+            sample_interior_wood_color() if stained else hsv2rgba(colors.white_hsv())
+        )
+        roughness = uniform(0.35, 0.6) if stained else uniform(0.5, 1.0)
         n_peaks = randint(1, 4)
         start_y = uniform(0.0, 0.5)
         mid_x = uniform(0.2, 0.8)
@@ -211,11 +221,15 @@ def apply_skirtingboard(
         Nodes.SetMaterial,
         input_kwargs={
             "Geometry": makeskirtingboard,
-            "Material": surface.shaderfunc_to_material(
-                plastic_rough.shader_rough_plastic,
-                base_color=color,
-                roughness=roughness,
-                displacement_scale=uniform(2.5, 4.0),
+            "Material": (
+                surface.shaderfunc_to_material(shader_wood, color=color)
+                if stained
+                else surface.shaderfunc_to_material(
+                    plastic_rough.shader_rough_plastic,
+                    base_color=color,
+                    roughness=roughness,
+                    displacement_scale=uniform(2.5, 4.0),
+                )
             ),
         },
     )
@@ -273,6 +287,88 @@ def make_skirtingboard_contour(objs: list[bpy.types.Object], tag: t.Subpart, con
     return contours
 
 
+def _world_z_range(obj):
+    zs = [(obj.matrix_world @ Vector(c)).z for c in obj.bound_box]
+    return min(zs), max(zs)
+
+
+def _cut_floor_openings(skirting, floor_tol=0.15):
+    """Stop the board at every doorway.
+
+    Only entrances used to be cut, so skirting ran straight across interior
+    doorways. The opening is widened to the architrave before differencing so
+    the board butts into the casing rather than disappearing behind it - and the
+    operand is a widened copy of the cutter box, since the casing mesh is itself
+    a boolean result and makes an unreliable operand.
+    """
+    cutters = butil.get_collection("placeholders:portal_cutters").objects
+    casings = butil.get_collection("unique_assets:door_casings").objects
+    skirt_z0, _ = _world_z_range(skirting)
+
+    for p in list(cutters):
+        if not p.name.startswith(("door", "entrance")):
+            continue
+        # Cutters left sitting at the origin are unplaced; a placed opening
+        # starts level with the floor the skirting sits on.
+        if abs(_world_z_range(p)[0] - skirt_z0) > floor_tol:
+            continue
+
+        # How far past the opening the architrave reaches, so the board butts
+        # into the casing instead of vanishing behind it. bound_box is local, so
+        # fold in each object's world scale, and hard-clamp the widening: a
+        # near-zero half-width once produced a runaway factor here and the
+        # resulting boolean operand exhausted memory mid-solve.
+        sx = max(abs(p.matrix_world.to_scale().x), 1e-6)
+        half = max((abs(v[0]) for v in p.bound_box), default=0.0) * sx
+        if half < 0.05:
+            continue
+        trim = half
+        for c in casings:
+            if c.parent is not p or not len(c.data.vertices):
+                continue
+            csx = max(abs(c.matrix_world.to_scale().x), 1e-6)
+            trim = max(trim, max(abs(v[0]) for v in c.bound_box) * csx)
+
+        ratio = trim / half
+        if ratio > 1.6:
+            logger.warning(
+                "%s: architrave/opening ratio %.1f is implausible (half=%.3f "
+                "trim=%.3f); clamping so the boolean operand stays sane",
+                p.name,
+                ratio,
+                half,
+                trim,
+            )
+        operand = butil.copy(p)
+        operand.scale[0] *= min(max(ratio, 1.0), 1.6)
+        # A convex box operand needs neither self-intersection handling nor hole
+        # tolerance, and both are costly: this runs once per opening over a
+        # whole storey's skirting, where the old entrance-only cut ran once.
+        butil.modify_mesh(
+            skirting, "BOOLEAN", object=operand, operation="DIFFERENCE"
+        )
+        butil.delete(operand)
+
+
+def _cut_ceiling_entrances(skirting, constants):
+    """Cornice keeps the old entrance-only behaviour: interior doors stop below it."""
+    for p in butil.get_collection("placeholders:portal_cutters").objects:
+        if (
+            p.name.startswith("entrance")
+            and int(p.location[-1] / constants.wall_height - 1 / 2) == 0
+        ):
+            p.location[-1] -= constants.wall_height / 2
+            butil.modify_mesh(
+                skirting,
+                "BOOLEAN",
+                object=p,
+                operation="DIFFERENCE",
+                use_self=True,
+                use_hole_tolerant=True,
+            )
+            p.location[-1] += constants.wall_height / 2
+
+
 def make_skirting_board(constants, objs, tag, joined=True):
     if joined:
         seqs = list(
@@ -304,22 +400,10 @@ def make_skirting_board(constants, objs, tag, joined=True):
         }
         surface.add_geomod(obj, apply_skirtingboard, apply=True, input_kwargs=kwargs)
 
-        portal_cutters = butil.get_collection("placeholders:portal_cutters").objects
-        for p in portal_cutters:
-            if (
-                p.name.startswith("entrance")
-                and int(p.location[-1] / constants.wall_height - 1 / 2) == 0
-            ):
-                p.location[-1] -= constants.wall_height / 2
-                butil.modify_mesh(
-                    obj,
-                    "BOOLEAN",
-                    object=p,
-                    operation="DIFFERENCE",
-                    use_self=True,
-                    use_hole_tolerant=True,
-                )
-                p.location[-1] += constants.wall_height / 2
+        if tag == t.Subpart.Ceiling:
+            _cut_ceiling_entrances(obj, constants)
+        else:
+            _cut_floor_openings(obj)
         butil.delete_collection(col)
         col = butil.get_collection("skirting")
         butil.put_in_collection(obj, col)

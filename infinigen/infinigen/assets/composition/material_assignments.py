@@ -39,11 +39,11 @@ doors = [
     (wood.WhitePlywood, 1.0),
 ]
 
-# Window frames: wood or painted/aluminum (not black/blonde plywood).
+# Window frames: flats overwhelmingly use anodised or powder-coated metal
+# sections; a stained timber frame is the occasional older fit-out.
 window_frames = [
-    (wood.InteriorWood, 6.0),
-    (wood.WhitePlywood, 3.5),
-    (metal.MetalBasic, 1.5),
+    (metal.WindowFrameMetal, 8.0),
+    (wood.InteriorWood, 1.5),
 ]
 
 wood_tiles = [
@@ -301,9 +301,10 @@ post = handrail
 
 # Dry rooms: builder plaster only (no colorful wall tiles in bedrooms / living / dining).
 wall = [(ceramic.Plaster, 1.0)]
+# Wet rooms: mostly painted plaster; tiles ~2/10 so defects stay on paint, not grout.
 kitchen_wall = [
-    (ceramic.Plaster, 3.0),
-    (ceramic.Tile, 4.0),
+    (ceramic.Plaster, 8.0),
+    (ceramic.Tile, 2.0),
 ]
 garage_wall = [
     (ceramic.Concrete, 5.0),
@@ -320,7 +321,8 @@ balcony_wall = [
     (ceramic.Plaster, 5.0),
 ]
 bathroom_wall = [
-    (ceramic.Tile, 5.0),
+    (ceramic.Plaster, 8.0),
+    (ceramic.Tile, 2.0),
 ]
 warehouse_wall = [
     (ceramic.Concrete, 5.0),
@@ -329,9 +331,16 @@ warehouse_wall = [
 ]
 wall_plaster = [(ceramic.Plaster, 1.0)]
 
-floor = wood_tiles + [
-    (ceramic.Tile, 4.0),
-    (fabric.Rug, 1.0),
+# Handover flats are laid with parquet blocks / herringbone or large glossy
+# ceramic. Hexagon parquet is a rarity, and a wall-to-wall rug is not a floor
+# finish at all - both would only be handed to the model as false positives.
+floor = [
+    (wood.CrossedWoodTile, 3.0),  # herringbone - the classic flat parquet
+    (wood.StaggeredWoodTile, 2.5),
+    (wood.CompositeWoodTile, 2.0),  # basket weave
+    (wood.HardwoodFloor, 1.5),
+    (wood.SquareWoodTile, 1.0),
+    (ceramic.Tile, 1.5),  # the large glossy ceramic alternative
 ]
 garage_floor = [
     (ceramic.Concrete, 1.0),

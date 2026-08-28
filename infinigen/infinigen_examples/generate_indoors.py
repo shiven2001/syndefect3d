@@ -478,21 +478,35 @@ def compose_indoors(
         ),
         use_chance=False,
     )
+    p.run_stage(
+        "strip_tiled_wall_defects",
+        lambda: room_dec.strip_defects_on_tiled_surfaces(
+            rooms_split["wall"].objects, [], state
+        ),
+        prereq="room_walls",
+        use_chance=False,
+    )
     def finalize_paint_bubbles():
         wall_by_name = {w.name: w for w in rooms_split["wall"].objects}
         for gen, obj in populate.deferred_wall_bubble_finalize:
+            if obj is None:
+                continue
             gen.finalize_assets([obj], state=state, wall_by_name=wall_by_name)
         populate.deferred_wall_bubble_finalize.clear()
 
     def finalize_paint_runs():
         wall_by_name = {w.name: w for w in rooms_split["wall"].objects}
         for gen, obj in populate.deferred_paint_run_finalize:
+            if obj is None:
+                continue
             gen.finalize_assets([obj], state=state, wall_by_name=wall_by_name)
         populate.deferred_paint_run_finalize.clear()
 
     def finalize_paint_patches():
         wall_by_name = {w.name: w for w in rooms_split["wall"].objects}
         for gen, obj in populate.deferred_paint_patch_finalize:
+            if obj is None:
+                continue
             gen.finalize_assets([obj], state=state, wall_by_name=wall_by_name)
         populate.deferred_paint_patch_finalize.clear()
 
@@ -522,6 +536,24 @@ def compose_indoors(
             rooms_split["ceiling"].objects,
             material_seed=overrides.get("material_seed", scene_seed + 3000),
         ),
+        use_chance=False,
+    )
+    p.run_stage(
+        "strip_tiled_ceiling_defects",
+        lambda: room_dec.strip_defects_on_tiled_surfaces(
+            [], rooms_split["ceiling"].objects, state
+        ),
+        prereq="room_ceilings",
+        use_chance=False,
+    )
+    p.run_stage(
+        "room_ceiling_beams",
+        lambda: room_dec.room_ceiling_beams(
+            rooms_split["ceiling"].objects,
+            constants,
+            material_seed=overrides.get("material_seed", scene_seed + 3100),
+        ),
+        prereq="room_ceilings",
         use_chance=False,
     )
     p.run_stage(

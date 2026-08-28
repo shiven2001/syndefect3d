@@ -11,6 +11,6 @@ from .wood import shader_wood_floor
 class HexagonWoodTile:
     def generate(self):
         shader_func = shader_wood_floor
-        return tile.Tile().generate(shader_func, "hexagon")
+        return tile.Tile().generate(shader_func=shader_func, shape="hexagon")
 
     __call__ = generate

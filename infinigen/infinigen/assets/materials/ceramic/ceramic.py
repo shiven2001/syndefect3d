@@ -15,7 +15,17 @@ from infinigen.core.util.random import log_uniform
 def shader_ceramic(
     nw: NodeWrangler, clear=False, roughness_min=0, roughness_max=0.8, **kwargs
 ):
-    if uniform(0, 1) < 0.8 and not clear:
+    # `clear=True` is the bathtub / sink / toilet path: glossy porcelain, not bumpy clay.
+    fixture = bool(clear or kwargs.get("fixture"))
+    if fixture:
+        color = hsv2rgba(
+            uniform(0.05, 0.14),
+            uniform(0.0, 0.035),
+            uniform(0.90, 0.98),
+        )
+        roughness_min = 0.035
+        roughness_max = 0.12
+    elif uniform(0, 1) < 0.8:
         color = hsv2rgba(uniform(0, 1), uniform(0.2, 0.4), log_uniform(0.3, 0.6))
     else:
         color = hsv2rgba(0, 0, log_uniform(0.3, 0.6))
@@ -24,45 +34,46 @@ def shader_ceramic(
         nw.musgrave(log_uniform(20, 40)), [(0, roughness_min), (1, roughness_max)]
     )
     clearcoat_roughness = nw.build_float_curve(
-        nw.musgrave(log_uniform(20, 40)), [(0, roughness_min), (1, roughness_max)]
+        nw.musgrave(log_uniform(20, 40)),
+        [(0, roughness_min), (1, min(0.22, roughness_max))],
     )
 
     principled_bsdf = nw.new_node(
         Nodes.PrincipledBSDF,
         input_kwargs={
             "Roughness": roughness,
-            "Coat Weight": 1,
+            "Coat Weight": 0.22 if fixture else 1,
             "Coat Roughness": clearcoat_roughness,
-            "Specular IOR Level": 1,
+            "Specular IOR Level": 0.55 if fixture else 1,
             "Base Color": color,
-            "Subsurface Weight": uniform(0.02, 0.05),
+            "Subsurface Weight": 0.01 if fixture else uniform(0.02, 0.05),
             "Subsurface Radius": (0.02, 0.02, 0.02),
         },
     )
 
-    noise_disp = nw.new_node(
-        Nodes.NoiseTexture, input_kwargs={"Scale": log_uniform(20, 40)}
-    )
-    musgrave_disp = nw.new_node(
-        Nodes.MusgraveTexture, input_kwargs={"Scale": log_uniform(30, 60)}
-    )
-    disp_height = nw.scalar_add(
-        nw.scalar_multiply(noise_disp.outputs["Fac"], log_uniform(0.003, 0.008)),
-        nw.scalar_multiply(musgrave_disp, log_uniform(0.0015, 0.005)),
-    )
-    displacement = nw.new_node(
-        "ShaderNodeDisplacement",
-        input_kwargs={
-            "Height": disp_height,
-            "Midlevel": 0.0000,
-            "Scale": log_uniform(0.45, 1.1),
-        },
-    )
+    out_kwargs = {"Surface": principled_bsdf}
+    if not fixture:
+        noise_disp = nw.new_node(
+            Nodes.NoiseTexture, input_kwargs={"Scale": log_uniform(20, 40)}
+        )
+        musgrave_disp = nw.new_node(
+            Nodes.MusgraveTexture, input_kwargs={"Scale": log_uniform(30, 60)}
+        )
+        disp_height = nw.scalar_add(
+            nw.scalar_multiply(noise_disp.outputs["Fac"], log_uniform(0.0004, 0.0012)),
+            nw.scalar_multiply(musgrave_disp, log_uniform(0.0002, 0.0006)),
+        )
+        displacement = nw.new_node(
+            "ShaderNodeDisplacement",
+            input_kwargs={
+                "Height": disp_height,
+                "Midlevel": 0.0000,
+                "Scale": log_uniform(0.15, 0.35),
+            },
+        )
+        out_kwargs["Displacement"] = displacement
 
-    nw.new_node(
-        Nodes.MaterialOutput,
-        input_kwargs={"Surface": principled_bsdf, "Displacement": displacement},
-    )
+    nw.new_node(Nodes.MaterialOutput, input_kwargs=out_kwargs)
 
 
 class Ceramic:

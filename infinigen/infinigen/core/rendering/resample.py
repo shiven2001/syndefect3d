@@ -285,9 +285,17 @@ def configure_photo_cycles(
 
     world = bpy.context.scene.world
     if world is not None and use_ao:
-        world.light_settings.use_ambient_occlusion = True
-        world.light_settings.ao_factor = float(ao_factor)
-        world.light_settings.distance = float(ao_distance)
+        # Cycles 4.x dropped world-level ambient occlusion. Fast GI is not a
+        # substitute - it adds ambient light and washes the room out. Corner
+        # darkening already comes from the AO node inside shader_plaster, so on
+        # 4.x there is simply nothing to set here.
+        light_settings = world.light_settings
+        if hasattr(light_settings, "use_ambient_occlusion"):
+            light_settings.use_ambient_occlusion = True
+            light_settings.ao_factor = float(ao_factor)
+            light_settings.distance = float(ao_distance)
+        else:
+            logger.debug("world AO unavailable on this Blender; relying on shader AO")
 
     view = bpy.context.scene.view_settings
     try:
@@ -353,6 +361,81 @@ def restore_ceiling_fixture_visibility(enabled=False):
 
 
 @gin.configurable
+def hide_cable_trunks(enabled=True):
+    """Hide PVC trunking on re-render of older blends."""
+    if not enabled:
+        return
+    tokens = (
+        "WallCableTrunk",
+        "CeilingCableTrunk",
+        "TrunkJunction",
+        "WallCableRiser",
+        "CableTrunk",
+    )
+    n = 0
+    col = bpy.data.collections.get("unique_assets:cable_trunks")
+    if col is not None:
+        col.hide_render = True
+        col.hide_viewport = True
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        if not any(tok in obj.name for tok in tokens):
+            continue
+        obj.hide_render = True
+        obj.hide_viewport = True
+        n += 1
+    if n:
+        logger.info("Hid %s cable-trunk objects", n)
+
+
+_FIXTURE_NAME_TOKENS = (
+    "Bathtub",
+    "BathroomSink",
+    "StandingSink",
+    "ToiletFactory",
+)
+
+
+@gin.configurable
+def flatten_bathroom_fixture_materials(enabled=True):
+    """Drop heavy ceramic displacement on tubs/sinks/toilets (helps existing blends)."""
+    if not enabled:
+        return
+    mats = set()
+    for obj in bpy.data.objects:
+        if obj.type != "MESH":
+            continue
+        if not any(tok in obj.name for tok in _FIXTURE_NAME_TOKENS):
+            continue
+        for slot in obj.material_slots:
+            if slot.material is not None:
+                mats.add(slot.material)
+        if obj.active_material is not None:
+            mats.add(obj.active_material)
+    n = 0
+    for mat in mats:
+        if not mat.use_nodes or mat.node_tree is None:
+            continue
+        out = next(
+            (nd for nd in mat.node_tree.nodes if nd.type == "OUTPUT_MATERIAL"),
+            None,
+        )
+        if out is None or "Displacement" not in out.inputs:
+            continue
+        links = list(out.inputs["Displacement"].links)
+        if not links:
+            continue
+        for link in links:
+            mat.node_tree.links.remove(link)
+        if hasattr(mat, "displacement_method"):
+            mat.displacement_method = "BUMP"
+        n += 1
+    if n:
+        logger.info("Flattened displacement on %s bathroom fixture materials", n)
+
+
+@gin.configurable
 def apply_realism_adjustments(
     refresh_room_surfaces=False,
     room_surface_seed=17,
@@ -367,6 +450,8 @@ def apply_realism_adjustments(
         sky_lighting.add_lighting()
     desaturate_surface_materials()
     dull_interior_floors()
+    flatten_bathroom_fixture_materials()
+    hide_cable_trunks()
     soften_existing_lights()
     configure_photo_cycles()
     restore_ceiling_fixture_visibility()

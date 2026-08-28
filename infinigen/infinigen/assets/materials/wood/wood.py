@@ -23,13 +23,51 @@ def get_color():
     )
 
 
+# Parquet / board colours as actually laid in flats: warm red-brown teak and
+# merbau through honey oak to pale ash. `get_color` scales value by up to 20x,
+# which sends most floors to a blown-out grey, so floors sample this instead.
+_FLOOR_WOOD_HSV = (
+    (0.038, 0.86, 0.40),  # merbau / dark teak
+    (0.046, 0.82, 0.50),  # red-brown teak
+    (0.055, 0.74, 0.54),  # mid oak
+    (0.068, 0.66, 0.62),  # honey oak
+    (0.076, 0.54, 0.68),  # pale oak
+    (0.058, 0.72, 0.36),  # dark walnut board
+)
+
+
+def sample_floor_wood_color():
+    h, s, v = _FLOOR_WOOD_HSV[int(np.random.randint(len(_FLOOR_WOOD_HSV)))]
+    return hsv2rgba(
+        h + uniform(-0.010, 0.010),
+        float(np.clip(s + uniform(-0.06, 0.06), 0.40, 0.92)),
+        float(np.clip(v + uniform(-0.06, 0.06), 0.24, 0.76)),
+    )
+
+
 def shader_wood(
-    nw: NodeWrangler, color=None, w=None, vertical=False, floor_finish=False, **kwargs
+    nw: NodeWrangler,
+    color=None,
+    w=None,
+    vertical=False,
+    floor_finish=False,
+    upright_grain=False,
+    **kwargs,
 ):
     # Code generated using version 2.6.4 of the node_transpiler
 
+    # mapping_2 below scales X by 5 and Y/Z by 100, so the grain runs along
+    # whichever axis ends up in X after this rotation.
     vec = nw.new_node(Nodes.TextureCoord).outputs["Object"]
-    if vertical:
+    if upright_grain:
+        # Boards standing on end - door leaves, casings, window frames. Rotating
+        # (pi/2, 0, pi/2) puts object Z into the mapping's X, so the grain runs up
+        # the board. Deterministic, unlike `vertical`, which randomizes the final
+        # turn and so only lands on Z half the time.
+        vec = nw.new_node(
+            Nodes.Mapping, [vec], input_kwargs={"Rotation": (np.pi / 2, 0, np.pi / 2)}
+        )
+    elif vertical:
         vec = nw.new_node(
             Nodes.Mapping,
             [vec],
@@ -42,7 +80,7 @@ def shader_wood(
     )
 
     if color is None:
-        color = get_color()
+        color = sample_floor_wood_color() if (floor_finish or kwargs.get("floor_finish")) else get_color()
     if w is None:
         w = uniform(0, 1)
     musgrave_texture_2 = nw.new_node(
@@ -233,24 +271,25 @@ class Wood:
 
 
 # Typical interior door / window-frame woods (oak, walnut, pine, maple, mahogany).
+# Doors and architraves in these flats are stained mid-to-dark warm brown. The
+# pale pine / maple end of the range came out grey once the shader's own
+# desaturation and AgX had been applied, so the palette stays warm and darker.
 _INTERIOR_WOOD_HSV = (
-    (0.075, 0.42, 0.38),  # walnut
-    (0.065, 0.48, 0.28),  # dark walnut
-    (0.082, 0.38, 0.48),  # oak
-    (0.090, 0.32, 0.58),  # light oak
-    (0.085, 0.22, 0.64),  # pine
-    (0.055, 0.50, 0.34),  # mahogany
-    (0.070, 0.18, 0.72),  # maple
-    (0.080, 0.28, 0.42),  # teak
+    (0.045, 0.82, 0.24),  # mahogany
+    (0.055, 0.78, 0.30),  # dark walnut
+    (0.062, 0.72, 0.38),  # walnut
+    (0.070, 0.66, 0.44),  # teak
+    (0.078, 0.58, 0.50),  # oak
+    (0.085, 0.48, 0.58),  # light oak
 )
 
 
 def sample_interior_wood_color():
     h, s, v = _INTERIOR_WOOD_HSV[int(np.random.randint(len(_INTERIOR_WOOD_HSV)))]
     return hsv2rgba(
-        h + uniform(-0.015, 0.015),
-        float(np.clip(s + uniform(-0.08, 0.08), 0.12, 0.62)),
-        float(np.clip(v + uniform(-0.08, 0.08), 0.22, 0.82)),
+        h + uniform(-0.010, 0.010),
+        float(np.clip(s + uniform(-0.06, 0.06), 0.38, 0.90)),
+        float(np.clip(v + uniform(-0.05, 0.05), 0.18, 0.64)),
     )
 
 
@@ -267,12 +306,14 @@ class InteriorWood:
     def generate(self, **kwargs):
         color = kwargs.pop("color", self.color)
         w = kwargs.pop("w", self.w)
+        kwargs.setdefault("upright_grain", True)
         return surface.shaderfunc_to_material(shader_wood, color=color, w=w, **kwargs)
 
     def apply(self, obj, selection=None, **kwargs):
         color = kwargs.pop("color", self.color)
         w = kwargs.pop("w", self.w)
         kwargs.pop("metal_color", None)
+        kwargs.setdefault("upright_grain", True)
         common.apply(obj, shader_wood, selection, color=color, w=w, **kwargs)
 
     __call__ = generate

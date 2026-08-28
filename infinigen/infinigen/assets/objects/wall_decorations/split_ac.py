@@ -10,6 +10,8 @@ from numpy.random import uniform
 from infinigen.assets.objects.wall_decorations.primitives import (
     assign,
     box,
+    plastic_material,
+    rounded_box,
     shade_smooth,
     solid_material,
 )
@@ -81,20 +83,21 @@ class SplitACFactory(AssetFactory):
         )
 
     def create_asset(self, **params):
-        body_mat = solid_material(
+        body_mat = plastic_material(
             f"SplitACBody_{self.factory_seed}",
             self.body_color,
-            roughness=uniform(0.22, 0.38),
+            roughness=uniform(0.26, 0.36),
+            sheen_scale=140.0,
         )
-        grille_mat = solid_material(
+        grille_mat = plastic_material(
             f"SplitACGrille_{self.factory_seed}",
             self.grille_color,
-            roughness=0.45,
+            roughness=0.48,
         )
-        trunk_mat = solid_material(
+        trunk_mat = plastic_material(
             f"SplitACTrunk_{self.factory_seed}",
             self.trunk_color,
-            roughness=0.40,
+            roughness=0.42,
         )
         led_mat = solid_material(
             f"SplitACLed_{self.factory_seed}",
@@ -102,14 +105,14 @@ class SplitACFactory(AssetFactory):
             roughness=0.15,
         )
 
-        housing = box(
+        housing = rounded_box(
             (self.depth * 0.92, self.width, self.height),
             location=(self.depth * 0.46, 0, 0),
+            radius=min(self.height, self.depth) * 0.30,
+            segments=8,
             name="splitac_housing",
         )
         assign(housing, body_mat)
-        butil.modify_mesh(housing, "BEVEL", width=0.012, segments=3)
-        shade_smooth(housing)
         parts = [housing]
 
         # Upper intake slats (front face).
@@ -144,17 +147,22 @@ class SplitACFactory(AssetFactory):
             assign(vane, grille_mat)
             parts.append(vane)
 
-        divider = box(
-            (0.006, self.width * 0.88, 0.006),
+        divider = rounded_box(
+            (0.008, self.width * 0.88, 0.006),
             location=(self.depth * 0.94, 0, -self.height * 0.04),
+            radius=0.002,
+            segments=3,
             name="splitac_divider",
         )
         assign(divider, grille_mat)
         parts.append(divider)
 
-        led = box(
+        # Display window sits flush in the lower fascia, right of centre.
+        led = rounded_box(
             (0.003, 0.028, 0.006),
             location=(self.depth * 0.95, self.width * 0.38, -self.height * 0.08),
+            radius=0.001,
+            segments=2,
             name="splitac_led",
         )
         assign(led, led_mat)

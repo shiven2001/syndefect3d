@@ -12,7 +12,7 @@ from .wood import shader_wood_floor
 class SquareWoodTile:
     def generate(self):
         shader_func = shader_wood_floor
-        return tile.Tile().generate(shader_func, "square")
+        return tile.Tile().generate(shader_func=shader_func, shape="square")
 
     __call__ = generate
 

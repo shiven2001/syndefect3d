@@ -13,6 +13,9 @@ from numpy.random import uniform as U
 
 from infinigen.assets.composition import material_assignments
 from infinigen.assets.utils.autobevel import BevelSharp
+from infinigen.assets.materials.dev.invisible_to_camera import (
+    shader_invisible,
+)
 from infinigen.core import surface
 from infinigen.core.nodes import node_utils
 from infinigen.core.nodes.node_wrangler import Nodes, NodeWrangler
@@ -75,6 +78,14 @@ class WindowFactory(AssetFactory):
             self.open = open
             self.curtain = curtain
             self.shutter = shutter
+            if curtain is False:
+                # The rail and its end caps are swept inside the node tree, so
+                # they survive Curtain=False and hang over the glass as metal
+                # blobs. Their geometry is not reachable from here; making the
+                # material invisible to camera is what actually removes them.
+                invisible = surface.shaderfunc_to_material(shader_invisible)
+                self.params["CurtainFrameMaterial"] = invisible
+                self.params["CurtainMaterial"] = invisible
 
     @staticmethod
     def sample_parameters():
@@ -200,6 +211,14 @@ class WindowFactory(AssetFactory):
         curtain_frame_radius = U(0.01, 0.02)
         curtain_mid_l = -U(0, width / 2)
         curtain_mid_r = U(0, width / 2)
+        if not curtain:
+            # Switching the curtain off only drops the cloth; the rail and its
+            # end caps are still swept and hang over the window as metal blobs.
+            # Collapse the rail so nothing is left behind.
+            curtain_frame_radius = 0.0
+            curtain_frame_depth = 0.0
+            curtain_depth = 0.0
+            curtain_interval_number = 0
 
         # Size / layout only. Frame and glass materials are sampled once on
         # the factory so every window in the scene matches.

@@ -1,5 +1,7 @@
 # SynDefect3D realism v2 — phone-like indoor defect renders.
-# Layer on top of existing configs; does not replace bedroom_minimal / defect_render.
+# bedroom / dining / livingroom _minimal.gin now `include` this file, so those
+# rooms get the photo look with no extra flag. Still safe to pass by hand with
+# -g for other configs (kitchen, bathroom, studio_apartment, defect_render).
 #
 # Coarse (new scenes / new defect-focus rigs):
 #   python -m infinigen_examples.generate_indoors --task coarse \
@@ -17,7 +19,7 @@
 # See REALISM_IMPROVEMENTS.md for validation and pilot re-render workflow.
 
 # --- Lighting ---
-configure_render_cycles.exposure = 1.7
+configure_render_cycles.exposure = 2.20
 nishita_lighting.strength = 0.24
 nishita_lighting.sun_elevation = ("clip_gaussian", 22, 10, 8, 40)
 nishita_lighting.sun_size_deg = ("clip_gaussian", 2.4, 0.7, 1.2, 4.5)
@@ -64,7 +66,7 @@ configure_render_cycles.num_samples = 1024
 configure_render_cycles.denoise = True
 
 # Extra dry-room wall/ceiling pull toward grey (tiles in kitchen/bathroom are skipped)
-desaturate_surface_materials.saturation_scale = 0.45
+desaturate_surface_materials.saturation_scale = 0.70
 desaturate_surface_materials.skip_wet_rooms = True
 
 # Builder-grade plaster (already default in plaster.py; listed for override)
@@ -75,7 +77,7 @@ plaster_paint_params.max_saturation = 0.04
 compositor_postprocessing.color_correct = True
 compositor_postprocessing.contrast = 1.06
 compositor_postprocessing.bright = 1.0
-compositor_postprocessing.saturation = 0.86
+compositor_postprocessing.saturation = 0.92
 compositor_postprocessing.distort = 0.018
 compositor_postprocessing.grain = 0.045
 compositor_postprocessing.glare = True

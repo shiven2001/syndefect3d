@@ -53,6 +53,74 @@ def solid_material(name, color, roughness=0.35, metallic=0.0):
     return mat
 
 
+def plastic_material(name, color, roughness=0.35, sheen_scale=None, variation=0.12):
+    """Moulded ABS fascia: roughness breaks up over the surface instead of sitting
+    at one value, which is what makes a flat `solid_material` panel read as CAD."""
+    if len(color) == 3:
+        color = (*color, 1.0)
+    mat = bpy.data.materials.new(name=name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = nt.nodes.get("Principled BSDF")
+    if bsdf is None:
+        bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
+    bsdf.inputs["Base Color"].default_value = color
+
+    # Fine noise -> roughness, so highlights crawl the way they do on real moulded
+    # plastic rather than forming one clean specular sheet.
+    tex_coord = nt.nodes.new("ShaderNodeTexCoord")
+    noise = nt.nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = (
+        sheen_scale if sheen_scale is not None else 180.0
+    )
+    noise.inputs["Detail"].default_value = 4.0
+    noise.inputs["Roughness"].default_value = 0.6
+    nt.links.new(tex_coord.outputs["Object"], noise.inputs["Vector"])
+
+    ramp = nt.nodes.new("ShaderNodeMapRange")
+    ramp.inputs["From Min"].default_value = 0.0
+    ramp.inputs["From Max"].default_value = 1.0
+    ramp.inputs["To Min"].default_value = max(0.04, roughness - variation)
+    ramp.inputs["To Max"].default_value = min(1.0, roughness + variation)
+    nt.links.new(noise.outputs["Fac"], ramp.inputs["Value"])
+    nt.links.new(ramp.outputs["Result"], bsdf.inputs["Roughness"])
+
+    if "Specular IOR Level" in bsdf.inputs:
+        bsdf.inputs["Specular IOR Level"].default_value = 0.42
+    return mat
+
+
+def rounded_box(size, location=(0.0, 0.0, 0.0), radius=0.004, segments=3, name="box"):
+    """Box with eased arrises - moulded parts have no truly sharp edges."""
+    obj = box(size, location=location, name=name)
+    butil.modify_mesh(obj, "BEVEL", width=radius, segments=segments, limit_method="ANGLE")
+    shade_smooth(obj)
+    return obj
+
+
+def glass_material(name, roughness=0.035, ior=1.48):
+    """Clear architectural glass for shower screens."""
+    mat = bpy.data.materials.new(name=name)
+    mat.use_nodes = True
+    mat.blend_method = "BLEND"
+    if hasattr(mat, "shadow_method"):
+        mat.shadow_method = "HASHED"
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    glass = nt.nodes.new("ShaderNodeBsdfGlass")
+    glass.inputs["Roughness"].default_value = roughness
+    glass.inputs["IOR"].default_value = ior
+    glass.inputs["Color"].default_value = (0.88, 0.94, 0.95, 1.0)
+    nt.links.new(glass.outputs[0], out.inputs["Surface"])
+    return mat
+
+
+def mirror_material(name, roughness=0.02):
+    """Front-silvered cabinet / medicine-cabinet mirror."""
+    return solid_material(name, (0.90, 0.91, 0.93), roughness=roughness, metallic=1.0)
+
+
 def assign(obj, mat):
     obj.active_material = mat
     if obj.data.materials:

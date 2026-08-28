@@ -667,6 +667,7 @@ def home_furniture_constraints(
     mirror = walldec[wall_decorations.MirrorFactory]
     ac_units = walldec[wall_decorations.SplitACFactory]
     wall_plugs = walldec[wall_decorations.WallPlugFactory]
+    light_switches = walldec[wall_decorations.WallSwitchFactory]
     faucets = walldec[wall_decorations.WallFaucetFactory]
     # Cable trunks are spawned from wall/ceiling geometry after solve
     # (see room_cable_trunks), not by the furniture solver.
@@ -729,16 +730,34 @@ def home_furniture_constraints(
     # Separate constraint for wall plugs (all rooms including bathrooms)
     constraints["wall_plugs"] = rooms.all(
         lambda r: (
-            wall_plugs.related_to(r).count().in_range(2, 10)
+            # Two to four outlets is what a room of this size is actually wired
+            # with; ten reads as a showroom of sockets.
+            wall_plugs.related_to(r).count().in_range(2, 4)
             * wall_plugs.related_to(r).all(
                 lambda t: (
-                    (t.distance(r, cu.floortags).in_range(0.2, 0.6))
-                    * (t.distance(cutters) > 0.2)
+                    (t.distance(r, cu.floortags).in_range(0.25, 0.45))
+                    * (t.distance(cutters) > 0.25)
                 )
             )
         )
     )
 
+    # Light switches: one plate per room, beside the door at ~1.2-1.4 m AFF.
+    # A room's several switches live as gangs on that single plate (see
+    # WallSwitchFactory.n_gangs); scattering separate plates around the walls is
+    # what made these read as fake. Clearance is set past the architrave so the
+    # plate sits on flat wall rather than riding the door casing.
+    constraints["light_switches"] = rooms.all(
+        lambda r: (
+            light_switches.related_to(r).count().in_range(1, 1)
+            * light_switches.related_to(r).all(
+                lambda t: (
+                    (t.distance(r, cu.floortags).in_range(1.15, 1.40))
+                    * (t.distance(cutters) > 0.16)
+                )
+            )
+        )
+    )
     # Faucets: wall-mounted decorations restricted to bathrooms.
     # Use similar logic to wall plugs (height from floor, clearance from cutters).
     constraints["faucets"] = rooms[Semantics.Bathroom].all(
@@ -1006,6 +1025,17 @@ def home_furniture_constraints(
                         weight=3
                     )
                 )
+            )
+        )
+    )
+
+    score_terms["light_switches"] = rooms.mean(
+        lambda r: light_switches.related_to(r).mean(
+            lambda sw: (
+                # Hard pull to just beside the door leaf - a switch anywhere else
+                # on the wall is the single clearest tell that a room is synthetic.
+                sw.distance(doors).hinge(0.18, 0.40).minimize(weight=30)
+                + cl.angle_alignment_cost(sw, r, cu.floortags).minimize(weight=5)
             )
         )
     )
@@ -1376,7 +1406,7 @@ def home_furniture_constraints(
 
     constraints["kitchen_sink"] = kitchens.all(
         lambda r: (
-            kitchen_sink.related_to(wallcounter.related_to(r)).count().in_range(0, 1)
+            kitchen_sink.related_to(wallcounter.related_to(r)).count().equals(1)
             * kitchen_sink.related_to(island.related_to(r)).count().in_range(0, 1)
         )
     )
@@ -1777,6 +1807,12 @@ def home_furniture_constraints(
     toilet = wallfurn[bathroom.ToiletFactory]
     bathtub = wallfurn[bathroom.BathtubFactory]
     sink = wallfurn[bathroom.StandingSinkFactory]
+    shower = wallfurn[bathroom.ShowerStallFactory]
+    vanity = wallfurn[bathroom.VanityCabinetFactory]
+    exhaust = obj[bathroom.ExhaustFanFactory].related_to(rooms, cu.hanging)
+    floor_drains = obj[bathroom.FloorDrainFactory].related_to(rooms, cu.on_floor)
+    medcab = walldec[bathroom.MedicineCabinetFactory]
+    tp_holder = walldec[bathroom.ToiletPaperHolderFactory]
 
     hardware = obj[bathroom.HardwareFactory].related_to(bathrooms, cu.against_wall)
 
@@ -1823,6 +1859,126 @@ def home_furniture_constraints(
     score_terms["bathroom"] = (
         mirror.related_to(bathrooms).distance(sink).minimize(weight=3)
     ) + cl.accessibility_cost(mirror, furniture, cu.down_dir).maximize(weight=3)
+
+    constraints["showers"] = bathrooms.all(
+        lambda r: (
+            shower.related_to(r).count().in_range(0, 1)
+            * shower.related_to(r).all(
+                lambda t: (
+                    (t.distance(cutters) > 0.25)
+                    * (t.distance(toilet) > 0.40)
+                    * (t.distance(sink) > 0.30)
+                    * (t.distance(bathtub) > 0.35)
+                )
+            )
+        )
+    )
+    score_terms["showers"] = bathrooms.mean(
+        lambda r: (
+            shower.related_to(r).count().maximize(weight=3)
+            + shower.related_to(r).mean(
+                lambda t: (
+                    t.distance(r, cu.walltags).minimize(weight=4)
+                    + t.distance(doors).maximize(weight=2)
+                    + cl.accessibility_cost(t, furniture, dist=0.6).minimize(weight=3)
+                )
+            )
+        )
+    )
+
+    constraints["vanities"] = bathrooms.all(
+        lambda r: (
+            vanity.related_to(r).count().in_range(0, 1)
+            * vanity.related_to(r).all(
+                lambda t: (
+                    (t.distance(toilet) > 0.30)
+                    * (t.distance(cutters) > 0.20)
+                    * (t.distance(shower) > 0.25)
+                )
+            )
+        )
+    )
+    score_terms["vanities"] = bathrooms.mean(
+        lambda r: (
+            vanity.related_to(r).count().maximize(weight=2)
+            + vanity.related_to(r).mean(
+                lambda t: t.distance(sink).hinge(0.05, 0.35).minimize(weight=5)
+            )
+        )
+    )
+
+    constraints["exhaust_fans"] = bathrooms.all(
+        lambda r: (
+            exhaust.related_to(r).count().equals(1)
+            * exhaust.related_to(r).all(
+                lambda t: (
+                    (t.distance(r, cu.ceilingtags).in_range(0.0, 0.02))
+                    * (t.distance(ceillights.related_to(r)) > 0.30)
+                )
+            )
+        )
+    )
+    score_terms["exhaust_fans"] = bathrooms.mean(
+        lambda r: exhaust.related_to(r).mean(
+            lambda t: (
+                t.distance(r, cu.ceilingtags).minimize(weight=8)
+                + t.distance(r, cu.walltags).hinge(0.15, 0.50).minimize(weight=3)
+            )
+        )
+    )
+
+    constraints["floor_drains"] = bathrooms.all(
+        lambda r: floor_drains.related_to(r).count().equals(1)
+    )
+    score_terms["floor_drains"] = bathrooms.mean(
+        lambda r: floor_drains.related_to(r).mean(
+            lambda t: (
+                t.distance(shower.related_to(r)).minimize(weight=3)
+                + t.distance(bathtub.related_to(r)).minimize(weight=1)
+            )
+        )
+    )
+
+    constraints["medicine_cabinets"] = bathrooms.all(
+        lambda r: (
+            medcab.related_to(r).count().in_range(0, 1)
+            * medcab.related_to(r).all(
+                lambda t: (
+                    (t.distance(r, cu.floortags).in_range(1.22, 1.52))
+                    * (t.distance(cutters) > 0.2)
+                    * (t.distance(mirror.related_to(r)) > 0.22)
+                )
+            )
+        )
+    )
+    score_terms["medicine_cabinets"] = bathrooms.mean(
+        lambda r: (
+            medcab.related_to(r).count().maximize(weight=2)
+            + medcab.related_to(r).mean(
+                lambda t: (
+                    t.distance(mirror.related_to(r)).hinge(0.28, 0.65).minimize(weight=5)
+                    + t.distance(sink).minimize(weight=2)
+                )
+            )
+        )
+    )
+
+    constraints["toilet_paper"] = bathrooms.all(
+        lambda r: (
+            tp_holder.related_to(r).count().equals(1)
+            * tp_holder.related_to(r).all(
+                lambda t: (
+                    (t.distance(r, cu.floortags).in_range(0.62, 0.75))
+                    * (t.distance(cutters) > 0.15)
+                )
+            )
+        )
+    )
+    score_terms["toilet_paper"] = bathrooms.mean(
+        lambda r: tp_holder.related_to(r).mean(
+            lambda t: t.distance(toilet.related_to(r)).hinge(0.15, 0.45).minimize(weight=8)
+        )
+    )
     # endregion
 
     # region MISC OBJECTS

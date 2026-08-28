@@ -666,9 +666,9 @@ class BaseDoorFactory(AssetFactory):
             self.handle_surface = weighted_sample(material_assignments.metal_neutral)()
             self.has_louver = True
 
-            self.handle_type = np.random.choice(
-                ["knob", "lever", "pull", "bar", "none"]
-            )
+            # Interior flat doors carry a lever or a knob. "bar" is a push-bar off
+            # a fire exit, "pull" a cabinet pull, and "none" leaves the leaf bare.
+            self.handle_type = np.random.choice(["lever", "knob"], p=[0.7, 0.3])
 
             # Room cutters are a fixed rectangle parented at +door_width/2.
             # full_frame_* shifts the leaf by ~half a door; left-hinge flips it

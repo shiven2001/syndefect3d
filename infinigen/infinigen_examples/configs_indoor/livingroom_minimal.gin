@@ -2,6 +2,10 @@
 # Spawns: Ceiling Lights ONLY
 # NO sofas, NO coffee table, NO storage, NO other furniture
 
+# Photo-like lighting, materials and compositing. Included rather than copied so
+# all three dry-room configs stay in step; bindings below still win.
+include 'infinigen_examples/configs_indoor/realism_v2.gin'
+
 # Use single room configuration
 BlueprintSolidifier.enable_open=False
 
@@ -12,7 +16,7 @@ restrict_solving.restrict_parent_rooms=["LivingRoom"]
 # Filter to only ceiling light, defect, AC, and wall plug constraints
 # Keeps: ceiling_lights, defects, ac_units, wall_plugs
 # Removes: sofa, sofa_positioning, tv, livingroom_objects
-restrict_solving.consgraph_filters=["ceiling_lights", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ac_units", "wall_plugs"]
+restrict_solving.consgraph_filters=["ceiling_lights", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ac_units", "wall_plugs", "light_switches"]
 
 # Disable terrain and other features
 compose_indoors.terrain_enabled = False
@@ -25,8 +29,8 @@ compose_indoors.solve_large_enabled = False
 
 # Extras
 compose_indoors.lights_off_chance = 0.0
-compose_indoors.skirting_floor_chance = 0.5
-compose_indoors.skirting_ceiling_chance = 0.5
+compose_indoors.skirting_floor_chance = 1.0
+compose_indoors.skirting_ceiling_chance = 0.3
 
 # Door settings - make ALL doors completely closed
 populate_doors.all_closed = True

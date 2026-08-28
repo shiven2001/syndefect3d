@@ -26,8 +26,9 @@ class DoorCasingFactory(AssetFactory):
             if constants is None:
                 constants = RoomConstants()
             self.constants = constants
-            self.margin = constants.door_size * uniform(0.05, 0.1)
-            self.extrude = uniform(0.02, 0.08)
+            # ~90-150 mm of architrave standing ~15-25 mm off the wall.
+            self.margin = constants.door_size * uniform(0.04, 0.065)
+            self.extrude = uniform(0.012, 0.025)
             self.bevel_all_sides = uniform() < 0.3
             self.surface = wood.InteriorWood()
             self.metal_color = colors.metal_hsv()
@@ -61,7 +62,12 @@ class DoorCasingFactory(AssetFactory):
             selection = ((np.abs(z_) > 0.5) & (np.abs(x) < w / 2 + self.margin / 2)) | (
                 (np.abs(x_) > 0.5) & (z < s + self.margin / 2)
             )
-        obj.data.edges.foreach_set("bevel_weight", selection)
+        # Blender 4.x keeps bevel weight in a named edge attribute rather than on
+        # the edge struct, so the modifier reads nothing unless we create it.
+        attr = obj.data.attributes.get("bevel_weight_edge")
+        if attr is None:
+            attr = obj.data.attributes.new("bevel_weight_edge", "FLOAT", "EDGE")
+        attr.data.foreach_set("value", selection.astype(float))
         bevel(obj, self.extrude, limit_method="WEIGHT")
         return obj
 

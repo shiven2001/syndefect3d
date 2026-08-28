@@ -10,3 +10,4 @@ from .wall_art import MirrorFactory, WallArtFactory
 from .wall_faucet import WallFaucetFactory
 from .wall_plug import WallPlugFactory
 from .wall_shelf import WallShelfFactory
+from .wall_switch import WallSwitchFactory

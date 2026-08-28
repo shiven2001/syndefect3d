@@ -372,15 +372,22 @@ def nodegroup_door_frame(nw: NodeWrangler):
         },
     )
 
+    # Recentres a full frame, whose rectangle is built off to one side of the
+    # origin. A single_column frame is just the one post and is already where it
+    # belongs, so gate the shift on full_frame - otherwise the whole leaf rides
+    # along with it and lands frame_width out of its wall opening.
     multiply_5 = nw.new_node(
         Nodes.Math,
-        input_kwargs={0: group_input.outputs["frame_width"], 1: 1.0000},
+        input_kwargs={
+            0: group_input.outputs["frame_width"],
+            1: group_input.outputs["full_frame"],
+        },
         attrs={"operation": "MULTIPLY"},
     )
 
     multiply_6 = nw.new_node(
         Nodes.Math,
-        input_kwargs={0: group_input.outputs["frame_width"], 1: -1.0000},
+        input_kwargs={0: multiply_5, 1: -1.0000},
         attrs={"operation": "MULTIPLY"},
     )
 

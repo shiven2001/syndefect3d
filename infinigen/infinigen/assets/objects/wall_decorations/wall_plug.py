@@ -10,6 +10,8 @@ from numpy.random import uniform
 from infinigen.assets.objects.wall_decorations.primitives import (
     assign,
     box,
+    plastic_material,
+    rounded_box,
     shade_smooth,
     solid_material,
 )
@@ -57,30 +59,30 @@ class WallPlugFactory(AssetFactory):
         return (i - 0.5) * span
 
     def create_asset(self, **params):
-        plate_mat = solid_material(
+        plate_mat = plastic_material(
             f"WallPlugPlate_{self.factory_seed}",
             self.plate_color,
-            roughness=uniform(0.28, 0.45),
+            roughness=uniform(0.30, 0.42),
         )
         slot_mat = solid_material(
             f"WallPlugSlot_{self.factory_seed}",
             self.slot_color,
-            roughness=0.55,
+            roughness=0.62,
         )
-        switch_mat = solid_material(
+        switch_mat = plastic_material(
             f"WallPlugSwitch_{self.factory_seed}",
             self.switch_color,
-            roughness=0.32,
+            roughness=0.34,
         )
 
-        plate = box(
+        plate = rounded_box(
             (self.thickness, self.plate_w, self.plate_h),
             location=(self.thickness / 2, 0, 0),
+            radius=min(0.006, self.thickness * 0.45),
+            segments=4,
             name="wallplug_plate",
         )
         assign(plate, plate_mat)
-        butil.modify_mesh(plate, "BEVEL", width=0.0012, segments=2)
-        shade_smooth(plate)
         parts = [plate]
 
         well_t = 0.002
@@ -95,16 +97,21 @@ class WallPlugFactory(AssetFactory):
             parts.append(well)
 
             if self.has_switch:
-                sw = box(
-                    (0.004, self.gang_w * 0.42, 0.014),
+                sw = rounded_box(
+                    (0.005, self.gang_w * 0.42, 0.014),
                     location=(
-                        self.thickness + 0.003,
+                        self.thickness + 0.0025,
                         cy,
                         self.plate_h * 0.22,
                     ),
+                    radius=0.0022,
+                    segments=4,
                     name=f"wallplug_switch_{i}",
                 )
+                sw.rotation_euler = (0, uniform(-0.05, 0.05), 0)
+                butil.apply_transform(sw)
                 assign(sw, switch_mat)
+                shade_smooth(sw)
                 parts.append(sw)
 
             slot_z = -0.008 if self.has_switch else 0.004
@@ -123,17 +130,25 @@ class WallPlugFactory(AssetFactory):
                 assign(slot, slot_mat)
                 parts.append(slot)
 
+        screw_mat = solid_material(
+            f"WallPlugScrew_{self.factory_seed}",
+            (0.55, 0.55, 0.57),
+            roughness=0.42,
+            metallic=1.0,
+        )
         for sign in (-1, 1):
-            screw = box(
-                (0.002, 0.006, 0.006),
+            screw = rounded_box(
+                (0.0012, 0.006, 0.006),
                 location=(
-                    self.thickness + 0.001,
+                    self.thickness - 0.0004,
                     0.0,
                     sign * (self.plate_h / 2 - 0.008),
                 ),
+                radius=0.0009,
+                segments=3,
                 name="wallplug_screw",
             )
-            assign(screw, slot_mat)
+            assign(screw, screw_mat)
             parts.append(screw)
 
         obj = join_objects(parts)

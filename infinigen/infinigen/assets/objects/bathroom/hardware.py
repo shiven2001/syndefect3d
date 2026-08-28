@@ -24,7 +24,8 @@ class HardwareFactory(AssetFactory):
             self.radius = uniform(0.01, 0.015)
             self.depth = uniform(0.06, 0.1)
             self.is_circular = uniform() < 0.5
-            self.hardware_type = np.random.choice(["hook", "holder", "bar", "ring"])
+            # Toilet-paper holders are a dedicated factory; keep generic towel hardware.
+            self.hardware_type = np.random.choice(["hook", "bar", "ring"])
             self.hook_length = self.attachment_radius * uniform(2, 4)
             self.holder_length = uniform(0.15, 0.25)
             self.bar_length = uniform(0.4, 0.8)

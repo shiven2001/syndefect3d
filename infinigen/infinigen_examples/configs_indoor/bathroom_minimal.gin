@@ -15,10 +15,10 @@ restrict_solving.restrict_parent_rooms=["Bathroom"]
 # We'll use consgraph_filters to keep only bathroom fixtures
 
 # Filter constraint graph to ONLY bathroom fixture constraints
-# Keeps: bathroom (toilet+sink+mirror), toilet, bathtub, defects, ceiling_lights, wall_plugs, faucets
+# Keeps: bathroom (toilet+sink+mirror), toilet, bathtub, shower, vanity, exhaust, drain, TP, medicine, defects, ceiling_lights, wall_plugs, faucets
 # Removes: storage-related constraints
 # Note: AC units are excluded for bathrooms (not in filters)
-restrict_solving.consgraph_filters=["bathroom", "toilet", "bathtub", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ceiling_lights", "wall_plugs", "faucets"]
+restrict_solving.consgraph_filters=["bathroom", "toilet", "bathtub", "showers", "vanities", "exhaust_fans", "floor_drains", "medicine_cabinets", "toilet_paper", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ceiling_lights", "wall_plugs", "faucets", "light_switches"]
 
 # Disable terrain and other features
 compose_indoors.terrain_enabled = False
@@ -31,8 +31,8 @@ compose_indoors.solve_large_enabled = True   # Keep large fixtures (toilet, sink
 
 # Extras
 compose_indoors.lights_off_chance = 0.0
-compose_indoors.skirting_floor_chance = 0.5
-compose_indoors.skirting_ceiling_chance = 0.5
+compose_indoors.skirting_floor_chance = 1.0
+compose_indoors.skirting_ceiling_chance = 0.3
 
 # Door settings - make ALL doors completely closed
 populate_doors.all_closed = True

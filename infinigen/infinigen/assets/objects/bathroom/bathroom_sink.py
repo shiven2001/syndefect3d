@@ -18,7 +18,6 @@ from infinigen.assets.utils.object import (
     new_bbox,
     new_cube,
 )
-from infinigen.core import surface
 from infinigen.core.util import blender as butil
 from infinigen.core.util.math import FixedSeed
 from infinigen.core.util.random import log_uniform, weighted_sample
@@ -61,10 +60,8 @@ class BathroomSinkFactory(BathtubFactory):
             self.is_stand_circular = uniform() < 0.5
             self.is_hole_centered = True
 
-            surface_gen_class = weighted_sample(
-                material_assignments.bathroom_touchsurface
-            )
-            self.surface_material_gen = surface_gen_class()
+            surface_gen_class = weighted_sample(material_assignments.ceramics)
+            self.surface_material_gen = surface_gen_class
 
     def create_placeholder(self, **kwargs) -> bpy.types.Object:
         return new_bbox(
@@ -102,8 +99,6 @@ class BathroomSinkFactory(BathtubFactory):
         obj = join_objects([obj, hole])
         obj.rotation_euler[-1] = np.pi / 2
         butil.apply_transform(obj, True)
-        # self.surface.apply(obj, clear=True, metal_color="plain")
-        surface.assign_material(obj, self.surface)
         if self.has_extrude:
             tap = self.tap_factory(np.random.randint(1e7))
             min_x = np.min(read_co(tap)[:, 0])
@@ -160,6 +155,7 @@ class BathroomSinkFactory(BathtubFactory):
         return obj
 
     def finalize_assets(self, assets):
+        self.surface.apply(assets, clear=True)
         if self.scratch:
             self.scratch.apply(assets)
         if self.edge_wear:
