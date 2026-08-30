@@ -20,8 +20,12 @@ import gin
 import infinigen.assets.scatters
 from infinigen.core import init
 from infinigen.core.placement import camera as cam_util
-from infinigen.core.rendering.render import render_image
-from infinigen.core.rendering.resample import apply_realism_adjustments, resample_scene
+from infinigen.core.rendering.render import bake_phone_compositor, render_image
+from infinigen.core.rendering.resample import (
+    apply_realism_adjustments,
+    configure_photo_cycles,
+    resample_scene,
+)
 from infinigen.core.tagging import tag_system
 from infinigen.core.util import blender as butil
 from infinigen.core.util import exporting
@@ -295,6 +299,8 @@ def execute_tasks(
                     input_folder / output_blend_name, output_folder / output_blend_name
                 )
             else:
+                configure_photo_cycles()
+                bake_phone_compositor()
                 bpy.ops.wm.save_mainfile(
                     filepath=str(output_folder / output_blend_name)
                 )

@@ -154,4 +154,7 @@ cython_debug/
 ###################################################
 
 /infinigen/outputs/
+/infinigen/resources/hdri/*.exr
+/infinigen/resources/hdri/*.hdr
+/infinigen/resources/hdri/*.part
 references/

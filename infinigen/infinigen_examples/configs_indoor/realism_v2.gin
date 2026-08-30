@@ -11,10 +11,12 @@
 # Indoor runs do not need terrain libs. Keep terrain off even if bedroom_minimal
 # is omitted (a second -g used to drop the first argparse value).
 #
-# Render (existing or new blends):
-#   python -m infinigen_examples.generate_indoors --task render \
-#     -g defect_render.gin realism_v2.gin \
-#     -p render.render_image_func=@defect/render_image ...
+# Render (existing or new blends) — this is what writes iPhone-like PNGs:
+#   python -m infinigen_examples.generate_indoors --seed 4 --task render \
+#     --input_folder outputs/dataset/livingroom_v25 \
+#     --output_folder outputs/dataset/livingroom_v25/frames \
+#     -g livingroom_minimal.gin defect_render.gin \
+#     -p execute_tasks.camera_id=\[0,0\]
 #
 # See REALISM_IMPROVEMENTS.md for validation and pilot re-render workflow.
 
@@ -40,6 +42,8 @@ add_multi_directional_sun_lighting.n_directions = 0
 add_multi_directional_sun_lighting.elevation_deg = 28.0
 add_multi_directional_sun_lighting.energy_per_sun = 1.6
 add_multi_directional_sun_lighting.sun_angle_deg = 0.53
+# Procedural Nishita sky through windows (not Poly Haven HDRI).
+sky_lighting.add_lighting.mode = "nishita"
 compose_indoors.lights_off_chance = 0.0
 compose_indoors.terrain_enabled = False
 populate_doors.all_closed = True
@@ -69,6 +73,10 @@ soften_existing_lights.sun_angle_deg = 0.53
 # zeroing the energy here makes an old blend render like a new one.
 soften_existing_lights.sun_energy = 0.0
 configure_photo_cycles.enabled = True
+# Blender 4.x names the AgX looks with the transform prefix - "Base Contrast"
+# on its own is not a valid enum value and is rejected.
+configure_photo_cycles.view_transform = "AgX"
+configure_photo_cycles.look = "AgX - Base Contrast"
 restore_ceiling_fixture_visibility.enabled = True
 
 # --- Defect cameras (must be set at coarse time for new rigs) ---
@@ -105,19 +113,23 @@ desaturate_surface_materials.skip_wet_rooms = True
 plaster_paint_params.colored_prob = 0.0
 plaster_paint_params.max_saturation = 0.04
 
-# --- Compositor: phone-like, not clean CG ---
-# Chain: Exposure -> grade -> Fog Glow -> barrel+CA -> Diamond Sharpen -> grain
-compositor_postprocessing.exposure = 1.0
+# Write Use Nodes + Viewer into scene.blend so the Compositing tab is not empty.
+bake_phone_compositor.enabled = True
+
+# --- Compositor: iPhone 11 still, not FPV camcorder ---
+# Phones computationally undo CA and keep HDR; only a hint of glow/sharpen/grain.
+compositor_postprocessing.exposure = 0.25
 compositor_postprocessing.color_correct = True
-compositor_postprocessing.contrast = 1.06
+compositor_postprocessing.contrast = 1.04
 compositor_postprocessing.bright = 1.0
-compositor_postprocessing.saturation = 0.92
+compositor_postprocessing.saturation = 0.98
+compositor_postprocessing.vignette = 0.0
 compositor_postprocessing.glare = True
-compositor_postprocessing.glare_type = "FOG_GLOW"
-compositor_postprocessing.glare_threshold = 0.40
-compositor_postprocessing.glare_mix = -0.55
-compositor_postprocessing.distort = 0.02
-compositor_postprocessing.dispersion = 0.012
-compositor_postprocessing.sharpen = 0.65
+compositor_postprocessing.glare_stack = [
+    {"glare_type": "FOG_GLOW", "quality": "HIGH", "mix": -0.92, "threshold": 0.70, "size": 6},
+]
+compositor_postprocessing.distort = 0.008
+compositor_postprocessing.dispersion = 0.004
+compositor_postprocessing.sharpen = 0.28
 compositor_postprocessing.sharpen_type = "SHARPEN_DIAMOND"
-compositor_postprocessing.grain = 0.045
+compositor_postprocessing.grain = 0.02

@@ -115,6 +115,20 @@ def make_clay():
                     mat_slot.material = clay_material
 
 
+def _glare_node(nw, source, *, glare_type, threshold, mix, quality="MEDIUM", size=8):
+    return nw.new_node(
+        Nodes.Glare,
+        input_kwargs={"Image": source},
+        attrs={
+            "glare_type": glare_type,
+            "quality": quality,
+            "threshold": float(threshold),
+            "mix": float(mix),
+            "size": int(size),
+        },
+    )
+
+
 @gin.configurable
 def compositor_postprocessing(
     nw,
@@ -130,6 +144,10 @@ def compositor_postprocessing(
     glare_type="FOG_GLOW",
     glare_threshold=0.85,
     glare_mix=-0.82,
+    glare_quality="MEDIUM",
+    glare_size=8,
+    glare_stack=(),
+    vignette=0.0,
     contrast=4.0,
     bright=1.0,
     saturation=1.0,
@@ -161,15 +179,47 @@ def compositor_postprocessing(
             input_kwargs={"Image": source, "Saturation": float(saturation)},
         )
 
-    if glare:
-        source = nw.new_node(
-            Nodes.Glare,
-            input_kwargs={"Image": source},
-            attrs={
-                "glare_type": glare_type,
-                "threshold": float(glare_threshold),
-                "mix": float(glare_mix),
+    if vignette and float(vignette) > 1e-6:
+        # Fac=1 at center (ellipse) keeps the original; edges mix toward black.
+        mask = nw.new_node(
+            Nodes.EllipseMask,
+            attrs={"x": 0.5, "y": 0.5, "width": 0.92, "height": 0.92},
+        )
+        darkened = nw.new_node(
+            Nodes.CompositorMixRGB,
+            input_kwargs={
+                "Fac": float(vignette),
+                1: source,
+                2: (0.0, 0.0, 0.0, 1.0),
             },
+            attrs={"blend_type": "MIX"},
+        )
+        source = nw.new_node(
+            Nodes.CompositorMixRGB,
+            input_kwargs={"Fac": mask, 1: darkened, 2: source},
+            attrs={"blend_type": "MIX"},
+        )
+
+    passes = list(glare_stack) if glare_stack else []
+    if not passes and glare:
+        passes = [
+            {
+                "glare_type": glare_type,
+                "threshold": glare_threshold,
+                "mix": glare_mix,
+                "quality": glare_quality,
+                "size": glare_size,
+            }
+        ]
+    for spec in passes:
+        source = _glare_node(
+            nw,
+            source,
+            glare_type=spec.get("glare_type", glare_type),
+            threshold=spec.get("threshold", glare_threshold),
+            mix=spec.get("mix", glare_mix),
+            quality=spec.get("quality", glare_quality),
+            size=spec.get("size", glare_size),
         )
 
     distort_amt = float(distort) if distort else 0.0
@@ -204,8 +254,32 @@ def compositor_postprocessing(
 
     if show:
         nw.new_node(Nodes.Composite, input_kwargs={"Image": source})
+        nw.new_node(Nodes.Viewer, input_kwargs={"Image": source})
 
     return source.outputs[0] if hasattr(source, "outputs") else source
+
+
+@gin.configurable
+def bake_phone_compositor(enabled=False):
+    """Write the phone compositor into the current .blend (Use Nodes + Viewer).
+
+    Coarse never used to do this, so opening scene.blend showed an empty
+    Compositing tab. Render still rebuilds the tree with File Output nodes.
+    """
+    if not enabled:
+        return
+    scene = bpy.context.scene
+    scene.use_nodes = True
+    if hasattr(scene.render, "use_compositing"):
+        scene.render.use_compositing = True
+    tree = scene.node_tree
+    if tree is None:
+        return
+    tree.nodes.clear()
+    nw = NodeWrangler(tree)
+    render_layers = nw.new_node(Nodes.RenderLayers)
+    compositor_postprocessing(nw, source=render_layers.outputs["Image"], show=True)
+    logger.info("Baked phone compositor into scene (%s nodes)", len(tree.nodes))
 
 
 @gin.configurable
@@ -474,6 +548,8 @@ def configure_compositor(
     flat_shading: bool,
 ):
     bpy.context.scene.use_nodes = True
+    if hasattr(bpy.context.scene.render, "use_compositing"):
+        bpy.context.scene.render.use_compositing = True
     compositor_node_tree = bpy.context.scene.node_tree
     compositor_node_tree.nodes.clear()
     nw = NodeWrangler(compositor_node_tree)

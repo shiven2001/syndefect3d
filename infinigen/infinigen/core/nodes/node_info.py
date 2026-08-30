@@ -258,6 +258,7 @@ class Nodes:
     HueSaturation = "CompositorNodeHueSat"
     CompositorTexture = "CompositorNodeTexture"
     CompositorFilter = "CompositorNodeFilter"
+    EllipseMask = "CompositorNodeEllipseMask"
 
     # World Nodes
     SkyTexture = "ShaderNodeTexSky"
@@ -351,7 +352,8 @@ NODE_ATTRS_AVAILABLE = {
     Nodes.SeparateColor: ["mode"],
     Nodes.DomainSize: ["component"],
     Nodes.CompositorFilter: ["filter_type"],
-    Nodes.Glare: ["glare_type", "quality", "mix", "threshold"],
+    Nodes.Glare: ["glare_type", "quality", "mix", "threshold", "size"],
+    Nodes.EllipseMask: ["x", "y", "width", "height"],
 }
 
 # Certain nodes should only be created once. This list defines which ones.

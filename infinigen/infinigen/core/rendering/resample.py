@@ -297,28 +297,31 @@ def configure_photo_cycles(
         else:
             logger.debug("world AO unavailable on this Blender; relying on shader AO")
 
+    # Assign and catch, rather than checking membership first. Both of these
+    # enums are populated from the OCIO config at runtime, so
+    # `bl_rna.properties[...].enum_items` reports only ('NONE',) - the old
+    # membership test never matched, and the tone map was silently left at
+    # whatever the scene default happened to be while the Look was never
+    # applied at all. The view transform has to be set before the look,
+    # because which looks exist depends on it.
     view = bpy.context.scene.view_settings
-    try:
-        available = {
-            item.identifier
-            for item in view.bl_rna.properties["view_transform"].enum_items
-        }
-        if view_transform in available:
-            view.view_transform = view_transform
-        elif "AgX" in available:
-            view.view_transform = "AgX"
-        elif "Filmic" in available:
-            view.view_transform = "Filmic"
-        look_ids = {
-            item.identifier for item in view.bl_rna.properties["look"].enum_items
-        }
-        if look in look_ids:
-            view.look = look
-    except Exception:
+    for candidate in (view_transform, "AgX", "Filmic"):
+        if not candidate:
+            continue
         try:
-            view.view_transform = "Filmic"
-        except Exception:
-            pass
+            view.view_transform = candidate
+            break
+        except TypeError:
+            logger.debug("view transform %r unavailable", candidate)
+    if look:
+        try:
+            view.look = look
+        except TypeError:
+            logger.warning(
+                "look %r unavailable for view transform %r; left at %r "
+                "(4.x names them 'AgX - Base Contrast', not 'Base Contrast')",
+                look, view.view_transform, view.look,
+            )
 
 
 def _looks_camera_invisible(mat) -> bool:

@@ -1,0 +1,15 @@
+{
+  "source": "https://polyhaven.com/hdris",
+  "license": "CC0",
+  "resolution": "2k",
+  "files": [
+    "kloppenheim_06_puresky_2k.exr",
+    "kloofendal_43d_clear_puresky_2k.exr",
+    "overcast_soil_puresky_2k.exr",
+    "sunflowers_puresky_2k.exr",
+    "evening_road_01_puresky_2k.exr",
+    "syferfontein_18d_clear_puresky_2k.exr",
+    "wasteland_clouds_puresky_2k.exr",
+    "qwantani_puresky_2k.exr"
+  ]
+}

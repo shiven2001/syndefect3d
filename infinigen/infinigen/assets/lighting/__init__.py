@@ -3,6 +3,6 @@
 
 # Authors: Hongyu Wen
 
-from . import sky_lighting
+from . import hdri_lighting, sky_lighting
 from .caustics_lamp import CausticsLampFactory
 from .indoor_lights import PointLampFactory

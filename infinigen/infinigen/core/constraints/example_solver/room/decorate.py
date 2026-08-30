@@ -497,6 +497,36 @@ def _window_hardware_material():
     return _WINDOW_HARDWARE_MATERIAL
 
 
+def _room_side_sign(cutter, room_state, probe=0.4):
+    """Which way the room lies from a portal cutter: +1 for local +Y, -1 for -Y.
+
+    A cutter's rotation comes from the wall segment it sits on
+    (``arctan2(y - y_, x - x_)`` in make_window_cutter), and that says nothing
+    about which side of the wall the room is. Assuming one side put the frame
+    on the outer face of the wall for every cutter that happened to be built
+    from a segment running the other way: from inside you then see a bare
+    reveal with the frame beyond it, which reads as an empty hole head-on and
+    as a detached, tilted sash at a glancing angle.
+    """
+    poly = getattr(room_state, "polygon", None)
+    if poly is None or poly.is_empty:
+        return -1.0
+
+    rot = cutter.rotation_euler[2]
+    nx, ny = -np.sin(rot), np.cos(rot)  # cutter's local +Y, in world XY
+    c = cutter.matrix_world.translation
+
+    inside_plus = poly.contains(shapely.Point(c.x + nx * probe, c.y + ny * probe))
+    inside_minus = poly.contains(shapely.Point(c.x - nx * probe, c.y - ny * probe))
+    if inside_plus != inside_minus:
+        return 1.0 if inside_plus else -1.0
+
+    # Both or neither - a probe landing in a doorway, or a cutter sitting a
+    # little off the contour. Fall back to where the room's mass is.
+    rp = poly.representative_point()
+    return 1.0 if ((rp.x - c.x) * nx + (rp.y - c.y) * ny) >= 0 else -1.0
+
+
 @gin.configurable
 def populate_windows(
     placeholders: list[bpy.types.Object], constants, state: state_def.State, n_windows=1
@@ -528,10 +558,12 @@ def populate_windows(
         butil.put_in_collection(list(butil.iter_object_tree(window)), col)
 
         window.parent = cutter
-        # Seated in the reveal, not stuck on the face of it. -Y is the room
-        # side; putting the frame's centre plane on the wall face left half the
-        # section standing proud of the plaster.
-        window.location[1] = -constants.wall_thickness / 2 + frame_thick / 2
+        # Seated in the reveal on the room side, not stuck on the face of it.
+        # Which side that is has to be measured per cutter - see
+        # _room_side_sign - because the cutter's rotation follows the wall
+        # segment, not the room.
+        side = _room_side_sign(cutter, state.objs[parent])
+        window.location[1] = side * (constants.wall_thickness / 2 - frame_thick / 2)
         window.rotation_euler[1] = np.pi
         windows.append(window)
         factory.finalize_assets(windows)
@@ -545,7 +577,9 @@ def populate_windows(
             int_hash((parent, j)), _window_hardware_material()
         )
         handle.parent = cutter
-        handle.rotation_euler[2] = -np.pi / 2
+        # The handle protrudes along its local +X, so turn it to point into the
+        # room - whichever side that turned out to be.
+        handle.rotation_euler[2] = side * np.pi / 2
         stile = 1.0 if uniform() < 0.5 else -1.0
         # Centre of the stile, read off the frame width the factory actually
         # drew rather than a fixed 24 mm guess that only matched some of them.
@@ -555,7 +589,7 @@ def populate_windows(
             # Backplate on the room-side face of the frame. Offsetting from the
             # frame's centre plane instead buried all but 2 mm of the handle
             # inside the section.
-            -constants.wall_thickness / 2 - 0.002,
+            side * (constants.wall_thickness / 2 + 0.002),
             -cutter_dims[2] * uniform(0.02, 0.10),
         )
         butil.put_in_collection([handle], col)

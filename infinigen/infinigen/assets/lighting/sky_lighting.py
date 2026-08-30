@@ -4,6 +4,7 @@
 # Authors: Alexander Raistrick, Zeyu Ma, Kaiyu Yang, Lingjie Mei
 
 
+import logging
 import math
 
 import bpy
@@ -14,6 +15,8 @@ from numpy.random import uniform
 from infinigen.core.nodes.node_wrangler import Nodes, NodeWrangler
 from infinigen.core.util.math import clip_gaussian
 from infinigen.core.util.random import random_general as rg
+
+logger = logging.getLogger(__name__)
 
 
 @gin.configurable
@@ -82,18 +85,45 @@ def nishita_lighting(
     )
 
 
-def add_lighting(cam=None):
+def _reset_world_tree():
+    world = bpy.context.scene.world
+    if world is None:
+        world = bpy.data.worlds.new("World")
+        bpy.context.scene.world = world
+    world.use_nodes = True
+    world.node_tree.nodes.clear()
+    return world
+
+
+@gin.configurable
+def add_lighting(cam=None, mode="nishita"):
+    """Install the world shader. ``mode`` is ``nishita`` (procedural sky) or ``hdri``.
+
+    HDRI uses ``hdri_lighting`` and files in ``resources/hdri``. If that folder is
+    empty, falls back to Nishita. An HDRI already stored in the .blend is kept
+    (so render does not pick a different map than coarse).
+    """
+    from infinigen.assets.lighting import hdri_lighting as hdri_mod
+
+    use_hdri = mode == "hdri"
+    if use_hdri and hdri_mod.existing_world_hdri_image() is not None:
+        logger.info("Keeping HDRI already in the world shader")
+        return
+    if use_hdri and not hdri_mod.list_hdri_files():
+        logger.warning(
+            "add_lighting mode=hdri but resources/hdri has no .exr/.hdr; "
+            "falling back to Nishita. Run python tools/download_polyhaven_hdris.py"
+        )
+        use_hdri = False
+
+    _reset_world_tree()
     nw = NodeWrangler(bpy.context.scene.world.node_tree)
-
-    if True:
-        surface = nishita_lighting(nw, cam)
+    if use_hdri:
+        surface = hdri_mod.hdri_lighting(nw)
     else:
-        # TODO more options
-        surface = None
+        surface = nishita_lighting(nw, cam)
 
-    volume = None
-
-    nw.new_node(Nodes.WorldOutput, input_kwargs={"Surface": surface, "Volume": volume})
+    nw.new_node(Nodes.WorldOutput, input_kwargs={"Surface": surface, "Volume": None})
 
 
 @gin.configurable
