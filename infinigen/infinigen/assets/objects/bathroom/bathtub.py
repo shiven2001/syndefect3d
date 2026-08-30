@@ -26,6 +26,13 @@ from infinigen.assets.utils.object import (
     new_cylinder,
     new_line,
 )
+from infinigen.assets.objects.bathroom.fittings import bathroom_chrome
+from infinigen.assets.objects.wall_decorations.primitives import (
+    assign,
+    box,
+    cylinder,
+    shade_smooth,
+)
 from infinigen.core import surface
 from infinigen.core.placement.factory import AssetFactory
 from infinigen.core.util import blender as butil
@@ -38,7 +45,8 @@ class BathtubFactory(AssetFactory):
     def __init__(self, factory_seed, coarse=False):
         super(BathtubFactory, self).__init__(factory_seed, coarse)
         with FixedSeed(factory_seed):
-            self.width = uniform(1.5, 2)
+            # A 2 m tub needs a 3 m clear wall run; flats fit compact baths.
+            self.width = uniform(1.45, 1.72)
             self.size = uniform(0.8, 1)
             self.depth = uniform(0.55, 0.7)
             prob = np.array([2, 2])
@@ -132,6 +140,10 @@ class BathtubFactory(AssetFactory):
         else:
             self.beveler(obj)
 
+        # Deck filler is a child so ceramic/subsurf on the tub cannot eat it.
+        filler = self.add_filler(obj)
+        filler.parent = obj
+        self._filler_obj = filler
         return obj
 
     def make_freestanding(self):
@@ -343,8 +355,122 @@ class BathtubFactory(AssetFactory):
         write_attribute(obj, 1, "hole", "FACE")
         return obj
 
+    def add_filler(self, tub):
+        """Deck-mounted bath mixer on the room-facing rim, spout into the basin.
+
+        Built from primitives (same chrome as the rest of the bathroom). Kept as
+        a child of the tub: joining it and then running SUBSURF melted the spout
+        into the porcelain.
+        """
+        chrome = bathroom_chrome()
+        r = uniform(0.012, 0.015)
+        rise = uniform(0.085, 0.110)
+        reach = uniform(0.14, 0.18)
+        handle_off = uniform(0.052, 0.062)
+        z_deck = 0.0
+        parts = []
+
+        def chrome_cyl(radius, height, loc, rot=(0.0, 0.0, 0.0), name="bath_fill"):
+            o = cylinder(radius, height, location=loc, rotation=rot, name=name)
+            assign(o, chrome)
+            shade_smooth(o)
+            return o
+
+        # Shared deck plate, then the column and a level spout over the water.
+        plate = chrome_cyl(r * 2.4, 0.010, (0.0, 0.0, z_deck + 0.005), name="bath_plate")
+        parts.append(plate)
+        parts.append(
+            chrome_cyl(r, rise, (0.0, 0.0, z_deck + 0.010 + rise / 2), name="bath_riser")
+        )
+        neck_z = z_deck + 0.010 + rise
+        parts.append(
+            chrome_cyl(
+                r * 0.92,
+                reach,
+                (-reach / 2, 0.0, neck_z),
+                rot=(0.0, np.pi / 2, 0.0),
+                name="bath_neck",
+            )
+        )
+        elbow = chrome_cyl(
+            r * 1.05,
+            r * 2.1,
+            (-reach, 0.0, neck_z),
+            rot=(0.0, np.pi / 2, 0.0),
+            name="bath_elbow",
+        )
+        parts.append(elbow)
+        drop = uniform(0.022, 0.030)
+        parts.append(
+            chrome_cyl(
+                r * 0.82,
+                drop,
+                (-reach, 0.0, neck_z - drop / 2),
+                name="bath_nozzle",
+            )
+        )
+        parts.append(
+            chrome_cyl(
+                r * 1.02,
+                0.008,
+                (-reach, 0.0, neck_z - drop),
+                name="bath_aerator",
+            )
+        )
+
+        # Hot / cold levers on the same rim, offset along the tub length.
+        # Stay in the deck plane (no +X stubs) so the set does not hang off the lip.
+        for sign in (-1, 1):
+            hy = sign * handle_off
+            parts.append(
+                chrome_cyl(r * 1.55, 0.012, (0.0, hy, z_deck + 0.006), name="bath_hbase")
+            )
+            parts.append(
+                chrome_cyl(
+                    r * 0.55,
+                    0.032,
+                    (0.0, hy, z_deck + 0.028),
+                    name="bath_hstem",
+                )
+            )
+            lever = box(
+                (0.012, 0.042, 0.010),
+                location=(0.0, hy + sign * 0.018, z_deck + 0.042),
+                name="bath_lever",
+            )
+            assign(lever, chrome)
+            butil.modify_mesh(lever, "BEVEL", width=0.002, segments=2)
+            parts.append(lever)
+
+        filler = join_objects(parts)
+        filler.name = f"BathtubFactory({self.factory_seed}).filler"
+        # Sit on the outer rim, not the inner slope: a median of the whole front
+        # band pulled the plate over the water so half of it looked airborne.
+        plate_r = r * 2.4
+        co = read_co(tub)
+        z_top = float(co[:, 2].max())
+        high = co[co[:, 2] > z_top - 0.045]
+        if len(high) > 8:
+            x_outer = float(high[:, 0].max())
+            rim = high[high[:, 0] > x_outer - 0.08]
+            # Centre the plate on the outer rim so it is not cantilevered inward.
+            rim_x = x_outer - plate_r
+            y0, y1 = float(high[:, 1].min()), float(high[:, 1].max())
+            rim_y = y0 + uniform(0.14, 0.20) * (y1 - y0)
+            rim_z = float(rim[:, 2].max()) if len(rim) else z_top
+        else:
+            rim_x = -max(self.thickness * 0.7, 0.030)
+            rim_y = self.width * uniform(0.14, 0.20)
+            rim_z = z_top
+        filler.location = (rim_x, rim_y, rim_z)
+        butil.apply_transform(filler, loc=True)
+        return filler
+
     def finalize_assets(self, assets):
         self.surface.apply(assets, clear=True)
+        filler = getattr(self, "_filler_obj", None)
+        if filler is not None:
+            surface.assign_material(filler, bathroom_chrome())
         if self.has_legs and not self.has_base:
             self.leg_surface.apply(assets, "leg", metal_color="bw+natural")
         self.hole_surface.apply(assets, "hole", metal_color="bw+natural")

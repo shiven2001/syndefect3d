@@ -24,7 +24,7 @@ from infinigen.assets.utils.decorate import (
     read_co,
 )
 from infinigen.assets.utils.draw import bezier_curve
-from infinigen.assets.utils.object import join_objects, new_plane
+from infinigen.assets.utils.object import new_plane
 from infinigen.assets.utils.shapes import obj2polygon
 from infinigen.core import surface, tagging
 from infinigen.core import tags as t
@@ -272,17 +272,23 @@ def make_skirtingboard_contour(objs: list[bpy.types.Object], tag: t.Subpart, con
 
     contours = []
 
+    # Openings are taken out of the contour here, in plan, rather than by
+    # differencing the finished board in 3D. The swept board is a thin closed
+    # shell and Blender's exact solver returns an empty mesh for it often
+    # enough to matter - against a storey-wide board that only lost a stretch,
+    # but against a single room's board it took the whole thing (bedroom 3042
+    # verts -> 0, kitchen 2248 -> 0), which is why per-room boards vanished.
+    # Subtracting rectangles from a ring is exact, and much faster.
+    band = 0.15 if tag == t.Subpart.Ceiling else 0.0
+    openings = _opening_footprints(constants, floor_z - band, floor_z + band)
+    cut = unary_union(openings) if openings else None
+
     for b in boundaries:
-        lr = b.exterior
-        o = linear_ring2curve(lr, constants)
-        contours.append(o)
-        o.location[-1] += floor_z
-        butil.apply_transform(o, True)
-        for lr in b.interiors:
-            o = linear_ring2curve(lr, constants, True)
-            contours.append(o)
-            o.location[-1] += floor_z
-            butil.apply_transform(o, True)
+        for lr, rev in [(b.exterior, False)] + [(i, True) for i in b.interiors]:
+            for o in linear_ring2curve(lr, constants, rev, cut):
+                contours.append(o)
+                o.location[-1] += floor_z
+                butil.apply_transform(o, True)
     butil.delete(objs)
     return contours
 
@@ -292,84 +298,64 @@ def _world_z_range(obj):
     return min(zs), max(zs)
 
 
-def _cut_floor_openings(skirting, floor_tol=0.15):
-    """Stop the board at every doorway.
+def _opening_footprints(constants, z_lo, z_hi, reveal=0.02):
+    """Plan-view rectangles of the openings that cross a given height band.
 
-    Only entrances used to be cut, so skirting ran straight across interior
-    doorways. The opening is widened to the architrave before differencing so
-    the board butts into the casing rather than disappearing behind it - and the
-    operand is a widened copy of the cutter box, since the casing mesh is itself
-    a boolean result and makes an unreliable operand.
+    Built from the portal cutters directly, in world XY. The cutter box is
+    about a metre deep so it can punch through the wall; used at that depth it
+    would also take the board off the walls returning either side of the
+    opening, so it is clamped to just over the wall thickness. The rectangle is
+    exact rather than an AABB, which matters on a wall that is not axis
+    aligned.
     """
-    cutters = butil.get_collection("placeholders:portal_cutters").objects
-    casings = butil.get_collection("unique_assets:door_casings").objects
-    skirt_z0, _ = _world_z_range(skirting)
-
-    for p in list(cutters):
+    boxes = []
+    for p in butil.get_collection("placeholders:portal_cutters").objects:
         if not p.name.startswith(("door", "entrance")):
             continue
-        # Cutters left sitting at the origin are unplaced; a placed opening
-        # starts level with the floor the skirting sits on.
-        if abs(_world_z_range(p)[0] - skirt_z0) > floor_tol:
+        z0, z1 = _world_z_range(p)
+        # Unplaced cutters still sit at the origin; a real opening spans the
+        # band the board occupies.
+        if z0 > z_lo + 0.15 or z1 < z_hi - 0.15:
             continue
 
-        # How far past the opening the architrave reaches, so the board butts
-        # into the casing instead of vanishing behind it. bound_box is local, so
-        # fold in each object's world scale, and hard-clamp the widening: a
-        # near-zero half-width once produced a runaway factor here and the
-        # resulting boolean operand exhausted memory mid-solve.
-        sx = max(abs(p.matrix_world.to_scale().x), 1e-6)
-        half = max((abs(v[0]) for v in p.bound_box), default=0.0) * sx
-        if half < 0.05:
+        scale = p.matrix_world.to_scale()
+        half_x = max((abs(v[0]) for v in p.bound_box), default=0.0) * abs(scale.x)
+        half_y = max((abs(v[1]) for v in p.bound_box), default=0.0) * abs(scale.y)
+        if half_x < 0.05 or half_y < 1e-6:
             continue
-        trim = half
-        for c in casings:
-            if c.parent is not p or not len(c.data.vertices):
-                continue
-            csx = max(abs(c.matrix_world.to_scale().x), 1e-6)
-            trim = max(trim, max(abs(v[0]) for v in c.bound_box) * csx)
 
-        ratio = trim / half
-        if ratio > 1.6:
-            logger.warning(
-                "%s: architrave/opening ratio %.1f is implausible (half=%.3f "
-                "trim=%.3f); clamping so the boolean operand stays sane",
-                p.name,
-                ratio,
-                half,
-                trim,
+        sx = half_x + reveal
+        sy = min(half_y, constants.wall_thickness * 0.5 + 0.06)
+        rot = p.rotation_euler[2]
+        cos_r, sin_r = np.cos(rot), np.sin(rot)
+        loc = p.matrix_world.translation
+        corners = [
+            (
+                loc.x + a * sx * cos_r - b * sy * sin_r,
+                loc.y + a * sx * sin_r + b * sy * cos_r,
             )
-        operand = butil.copy(p)
-        operand.scale[0] *= min(max(ratio, 1.0), 1.6)
-        # A convex box operand needs neither self-intersection handling nor hole
-        # tolerance, and both are costly: this runs once per opening over a
-        # whole storey's skirting, where the old entrance-only cut ran once.
-        butil.modify_mesh(
-            skirting, "BOOLEAN", object=operand, operation="DIFFERENCE"
-        )
-        butil.delete(operand)
+            for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1))
+        ]
+        boxes.append(shapely.Polygon(corners))
+    return boxes
 
 
-def _cut_ceiling_entrances(skirting, constants):
-    """Cornice keeps the old entrance-only behaviour: interior doors stop below it."""
-    for p in butil.get_collection("placeholders:portal_cutters").objects:
-        if (
-            p.name.startswith("entrance")
-            and int(p.location[-1] / constants.wall_height - 1 / 2) == 0
-        ):
-            p.location[-1] -= constants.wall_height / 2
-            butil.modify_mesh(
-                skirting,
-                "BOOLEAN",
-                object=p,
-                operation="DIFFERENCE",
-                use_self=True,
-                use_hole_tolerant=True,
-            )
-            p.location[-1] += constants.wall_height / 2
+def make_skirting_board(constants, objs, tag, joined=False, keep_rooms=None):
+    """One board per room (not a storey-wide union).
 
+    A single joined contour follows the apartment outline, so internal walls
+    get no skirting and the board cannot be hidden per room. Per-room boards
+    sit on each room's own walls and can be culled with hide_other_rooms.
+    """
+    if keep_rooms is not None:
+        objs = [
+            o
+            for o in objs
+            if any(k.split(".")[0] in o.name for k in keep_rooms)
+        ]
+    if not objs:
+        return
 
-def make_skirting_board(constants, objs, tag, joined=True):
     if joined:
         seqs = list(
             [o for o in objs if room_level(o.name.split(".")[0]) == i]
@@ -379,18 +365,21 @@ def make_skirting_board(constants, objs, tag, joined=True):
         seqs = [[o] for o in objs]
 
     for s in seqs:
-        logger.debug(f"make_skirting_board for {len(objs)=} {tag=}")
+        if not s:
+            continue
+        logger.debug(f"make_skirting_board for {len(s)=} {tag=}")
 
         try:
             contours = make_skirtingboard_contour(s, tag, constants)
         except shapely.errors.GEOSException as e:
             logger.warning(
-                f"make_skirting_board({objs=}, {tag=}) failed with {e}, skipping"
+                f"make_skirting_board({s=}, {tag=}) failed with {e}, skipping"
             )
-            return
+            continue
 
         obj = new_plane()
-        obj.name = "skirtingboard_" + tag.value
+        stem = s[0].name.split(".")[0]
+        obj.name = f"{stem}.skirtingboard_{tag.value}"
 
         col = butil.put_in_collection(contours, "contour")
         kwargs = {
@@ -400,31 +389,38 @@ def make_skirting_board(constants, objs, tag, joined=True):
         }
         surface.add_geomod(obj, apply_skirtingboard, apply=True, input_kwargs=kwargs)
 
-        if tag == t.Subpart.Ceiling:
-            _cut_ceiling_entrances(obj, constants)
-        else:
-            _cut_floor_openings(obj)
         butil.delete_collection(col)
         col = butil.get_collection("skirting")
         butil.put_in_collection(obj, col)
 
 
-def linear_ring2curve(ring, constants, reversed=False):
+def linear_ring2curve(ring, constants, reversed=False, cut=None):
+    """The ring, minus the doorways it runs through, as one curve per run.
+
+    This used to drop any segment whose length happened to fall within 2 cm of
+    wall_thickness or door_width, as a way of guessing where the doorways were.
+    It guesses wrong: an ordinary ~0.9 m wall run is indistinguishable from a
+    door opening by length alone, so stretches of board went missing for no
+    visible reason. `cut` is the real openings, taken from the portal cutters.
+    """
     coords = ring.coords
     if shapely.is_ccw(ring) == reversed:
         coords = coords[::-1]
-    coords = np.array(coords)
-    lengths = np.linalg.norm(coords[:-1] - coords[1:], axis=-1)
-    invalid = np.sort(
-        np.nonzero(
-            (np.abs(lengths - constants.wall_thickness) < 0.02)
-            | (np.abs(lengths - constants.door_width) < 0.02)
-        )[0]
+
+    line = shapely.LineString(coords)
+    if cut is not None and not cut.is_empty:
+        line = line.difference(cut)
+    parts = (
+        list(line.geoms) if line.geom_type == "MultiLineString" else [line]
     )
-    ranges = -1, *invalid, len(coords)
+
     curves = []
-    for l, r in zip(ranges[:-1], ranges[1:]):
-        x, y = np.array(coords[l + 1 : r + 1]).T
-        if len(x) > 1:
-            curves.append(bezier_curve((x, y, 0), list(np.arange(len(x))), 1, False))
-    return join_objects(curves)
+    for part in parts:
+        if part.is_empty or part.geom_type != "LineString":
+            continue
+        pts = np.array(part.coords)
+        if len(pts) < 2:
+            continue
+        x, y = pts.T
+        curves.append(bezier_curve((x, y, 0), list(np.arange(len(x))), 1, False))
+    return curves

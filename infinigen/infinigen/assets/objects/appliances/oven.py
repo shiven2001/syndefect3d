@@ -11,7 +11,6 @@ from numpy.random import normal as N
 from numpy.random import randint as RI
 from numpy.random import uniform as U
 
-from infinigen.assets.composition import material_assignments
 from infinigen.assets.utils.misc import generate_text
 from infinigen.core.nodes import node_utils
 from infinigen.core.nodes.node_wrangler import Nodes, NodeWrangler
@@ -25,7 +24,6 @@ from infinigen.core.util.bevelling import (
 )
 from infinigen.core.util.blender import delete
 from infinigen.core.util.math import FixedSeed
-from infinigen.core.util.random import weighted_sample
 
 
 @gin.configurable
@@ -42,23 +40,22 @@ class OvenFactory(AssetFactory):
         self.geometry_node_params.update(self.material_params)
 
     def get_material_params(self):
-        params = {
-            "Surface": weighted_sample(material_assignments.metals)(),
-            "Back": weighted_sample(material_assignments.metals)(),
-            "WhiteMetal": weighted_sample(material_assignments.metals)(),
-            "SuperBlackGlass": weighted_sample(
-                material_assignments.appliance_front_maybeglass
-            )(),
-            "Glass": weighted_sample(material_assignments.appliance_front_glass)(),
+        from infinigen.assets.materials.metal.appliance import BlackGlass
+        from infinigen.assets.objects.wall_decorations.primitives import appliance_steel
+
+        # Fitted-kitchen ovens are stainless with a dark glass door. Sampling
+        # the general metals list gave galvanized, hammered or warm-bronze
+        # bodies, and the glass slot often came back as another metal.
+        steel = appliance_steel()
+        glass = BlackGlass()()
+        wrapped_params = {
+            "Surface": steel,
+            "Back": steel,
+            "WhiteMetal": steel,
+            "SuperBlackGlass": glass,
+            "Glass": glass,
         }
-        wrapped_params = {k: v() for k, v in params.items()}
-
-        scratch_prob, edge_wear_prob = material_assignments.wear_tear_prob
-        scratch, edge_wear = material_assignments.wear_tear
-        scratch = None if U() > scratch_prob else scratch()
-        edge_wear = None if U() > edge_wear_prob else edge_wear()
-
-        return wrapped_params, scratch, edge_wear
+        return wrapped_params, None, None
 
     @staticmethod
     def sample_parameters(dimensions):

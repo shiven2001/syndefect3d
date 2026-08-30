@@ -4,6 +4,7 @@
 # Authors: Beining Han
 # Acknowledgement: This file draws inspiration from https://www.youtube.com/watch?v=jDEijCwz6to by Lachlan Sarv
 
+import bpy
 import numpy as np
 from numpy.random import normal, uniform
 
@@ -46,6 +47,11 @@ def shader_shelves_white(nw: NodeWrangler, **kwargs):
         Nodes.Displacement,
         input_kwargs={
             "Height": nw.scalar_multiply(disp_noise.outputs["Fac"], uniform(0.002, 0.005)),
+            # Midlevel defaults to 0.5, so a height of ~0 displaces the whole
+            # surface by -0.5*Scale along its normal. Fine as a bump map, but
+            # real geometry under displacement_mode="BOTH" - it crumpled small
+            # metal parts (taps, handles) into blobs.
+            "Midlevel": 0.0,
             "Scale": uniform(0.3, 0.6),
         },
     )
@@ -480,6 +486,12 @@ def shader_shelves_white_metallic_sampler():
 
 
 def get_shelf_material(name, **kwargs):
+    # Already a material: hand it straight back. Falling through to the match
+    # below sent it to `case _`, which drew a fresh random finish - which is how
+    # a kitchen whose carcass materials were pinned still came out with the
+    # drawers and pulls in three other woods.
+    if isinstance(name, bpy.types.Material):
+        return name
     match name:
         case "white":
             shader_func = np.random.choice(
@@ -522,8 +534,13 @@ def get_shelf_material(name, **kwargs):
 
 
 def shader_shelves_black_wood_z(nw: NodeWrangler, **kwargs):
-    shader_shelves_black_wood(nw, z_axis_texture=True)
+    kwargs["z_axis_texture"] = True
+    shader_shelves_black_wood(nw, **kwargs)
 
 
 def shader_shelves_wood_z(nw: NodeWrangler, **kwargs):
-    shader_shelves_wood(nw, z_axis_texture=True)
+    # kwargs were dropped here, so a pinned palette never reached the
+    # vertical-grain variant and the two halves of one cabinet came out in
+    # different timbers.
+    kwargs["z_axis_texture"] = True
+    shader_shelves_wood(nw, **kwargs)

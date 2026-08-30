@@ -1,12 +1,24 @@
-FloorPlanSolver.n_divide_trials = 25
-FloorPlanSolver.iters_mult = 25
+# Floorplan optimisation is left at full strength. Cutting it to 25/25 saves
+# only ~20s of a ~60s coarse but leaves the per-room area objective far from
+# converged - bathrooms came out at 190 m2 instead of the 8 m2 target, which is
+# what scattered the fixtures across the room. Object solving below is where
+# this config actually buys its speed.
+FloorPlanSolver.n_divide_trials = 100
+FloorPlanSolver.iters_mult = 200
 
 home_room_constraints.has_fewer_rooms = True
 
 solve_objects.addition_weight_scalar = 3.0
 
 compose_indoors.solve_steps_large = 100
-compose_indoors.solve_steps_medium = 40
-compose_indoors.solve_steps_small = 5
+# Left at the upstream default. At 60 the wall stage finished with viol=11.4:
+# sockets landed at 1.5 m instead of 0.25-0.45, switches at 0.6 m, and the AC
+# anywhere on the wall - the placements that read as "solver failed". The two
+# medium stages cost ~0.15 s a move, so the extra 140 buys correctness for
+# ~40 s, against the minutes solve_large already takes.
+compose_indoors.solve_steps_medium = 200
+# 5 steps could not place small wall items at all - paper holders and mixers
+# were simply left out of finished bathrooms.
+compose_indoors.solve_steps_small = 30
 
 compose_indoors.terrain_enabled = False

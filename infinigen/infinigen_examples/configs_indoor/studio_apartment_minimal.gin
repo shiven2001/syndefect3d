@@ -9,15 +9,27 @@
 #   Kitchen — counters, island, sink + built-ins (no appliances / bar chairs)
 #   Bathroom — toilet, sink, mirror, bathtub, shower, vanity, exhaust, drain, TP, medicine + faucets
 
+# Photo-like lighting, materials and compositing, same as the dry-room configs.
+include 'infinigen_examples/configs_indoor/realism_v2.gin'
+
 # Compact floor plan (same as studio.gin / fast_solve.gin)
 home_room_constraints.has_fewer_rooms = True
-FloorPlanSolver.n_divide_trials = 25
-FloorPlanSolver.iters_mult = 25
+# 25/25 leaves the per-room area objective far from converged - bathrooms came
+# out at 190 m2 against an 8 m2 target, which is what scattered their fixtures.
+FloorPlanSolver.n_divide_trials = 100
+FloorPlanSolver.iters_mult = 200
 solve_objects.addition_weight_scalar = 3.0
 
 compose_indoors.solve_steps_large = 100
-compose_indoors.solve_steps_medium = 40
-compose_indoors.solve_steps_small = 5
+# 40 left the wall stage with violations: sockets at 1.5 m, switches at 2.3 m.
+compose_indoors.solve_steps_medium = 200
+# 5 could not place small wall items at all - paper holders and mixers were
+# simply left out of finished bathrooms.
+compose_indoors.solve_steps_small = 30
+
+# No island: nowhere in a studio has the >2 m clearance its placement rule
+# needs, so every large step was spent proposing one and rejecting it.
+home_furniture_constraints.kitchen_island_enabled = False
 
 compose_indoors.terrain_enabled = False
 compose_indoors.hide_other_rooms_enabled = False

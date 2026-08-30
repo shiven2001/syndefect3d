@@ -9,6 +9,8 @@ from numpy.random import uniform
 from infinigen.assets.composition import material_assignments
 from infinigen.assets.utils.decorate import subsurf
 from infinigen.assets.utils.object import join_objects, new_base_cylinder, new_cube
+from infinigen.assets.objects.bathroom.fittings import bathroom_chrome
+from infinigen.core import surface
 from infinigen.core.placement.factory import AssetFactory
 from infinigen.core.util import blender as butil
 from infinigen.core.util.math import FixedSeed
@@ -131,7 +133,10 @@ class HardwareFactory(AssetFactory):
         return obj
 
     def finalize_assets(self, assets):
-        self.surface.apply(assets, metal_color="plain")
+        # Rails and hooks are part of the same fitting set as the taps and the
+        # shower valve, so they take the shared chrome rather than an
+        # independently sampled metal.
+        surface.assign_material(assets, bathroom_chrome())
         if self.scratch:
             self.scratch.apply(assets)
         if self.edge_wear:

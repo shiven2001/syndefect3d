@@ -172,6 +172,11 @@ def shader_brushed_metal(
         Nodes.Displacement,
         input_kwargs={
             "Height": nw.scalar_multiply(disp_noise.outputs["Fac"], uniform(0.002, 0.005)),
+            # Midlevel defaults to 0.5, so a height of ~0 displaces the whole
+            # surface by -0.5*Scale along its normal. Fine as a bump map, but
+            # real geometry under displacement_mode="BOTH" - it crumpled small
+            # metal parts (taps, handles) into blobs.
+            "Midlevel": 0.0,
             "Scale": uniform(0.35, 0.8),
         },
     )

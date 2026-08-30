@@ -137,3 +137,24 @@ def shift_min_x_to_zero(obj):
     obj.location.x -= min_x
     butil.apply_transform(obj, loc=True)
     return obj
+
+_STEEL_NAME = "ApplianceSteel"
+
+
+def appliance_steel():
+    """Brushed stainless for appliance faces, created once per blend file.
+
+    Hoods, sinks and mixers used to sample the general metals list one by one,
+    so a kitchen came out with a hammered-bronze basin under a brushed tap
+    beside a galvanized hood. Appliance faces are neutral steel and they match.
+    """
+    mat = bpy.data.materials.get(_STEEL_NAME)
+    if mat is None:
+        mat = solid_material(
+            _STEEL_NAME,
+            (0.78, 0.79, 0.80),
+            roughness=0.28,
+            metallic=1.0,
+        )
+        mat.name = _STEEL_NAME
+    return mat

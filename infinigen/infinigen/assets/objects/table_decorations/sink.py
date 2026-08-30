@@ -13,6 +13,7 @@ import numpy as np
 from numpy.random import uniform as U
 
 from infinigen.assets.composition import material_assignments
+from infinigen.assets.objects.wall_decorations.primitives import appliance_steel
 from infinigen.assets.objects.table_decorations.kitchen_mixer import KitchenMixerFactory
 from infinigen.assets.utils import bbox_from_mesh
 from infinigen.assets.utils.extract_nodegroup_parts import extract_nodegroup_geo
@@ -44,11 +45,11 @@ class SinkFactory(AssetFactory):
         self.tap_factory = KitchenMixerFactory(factory_seed)
 
     def get_material_params(self):
-        params = {
-            "Sink": weighted_sample(material_assignments.metals)(),
-            "Tap": weighted_sample(material_assignments.metals)(),
-        }
-        wrapped_params = {k: v() for k, v in params.items()}
+        # Basin and mixer are stainless, and the same stainless. Sampling the
+        # general metals list twice gave a hammered-bronze basin under a
+        # brushed tap - two finishes that are not sold together and neither of
+        # which belongs on a flat's kitchen sink.
+        wrapped_params = {"Sink": appliance_steel(), "Tap": appliance_steel()}
 
         scratch_prob, edge_wear_prob = material_assignments.wear_tear_prob
         scratch, edge_wear = material_assignments.wear_tear
@@ -155,11 +156,7 @@ class TapFactory(AssetFactory):
         return params
 
     def get_material_params(self):
-        tap_gen_class = weighted_sample(material_assignments.metals)
-
-        tap_material_gen = tap_gen_class()
-
-        wrapped_params = {"Tap": tap_material_gen()}
+        wrapped_params = {"Tap": appliance_steel()}
 
         scratch_prob, edge_wear_prob = material_assignments.wear_tear_prob
         scratch, edge_wear = material_assignments.wear_tear

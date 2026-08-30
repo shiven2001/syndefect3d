@@ -241,6 +241,11 @@ def compose_indoors(
             stages["on_floor_freestanding"], state, [cu.variable_room], limits
         )
     ]
+    visible_rooms = (
+        [r.name for r in solved_rooms]
+        if overrides.get("hide_other_rooms_enabled")
+        else None
+    )
     solved_bound_points = np.concatenate([butil.bounds(r) for r in solved_rooms])
     solved_bbox = (
         np.min(solved_bound_points, axis=0),
@@ -439,11 +444,18 @@ def compose_indoors(
     )
     p.run_stage(
         "skirting_floor",
-        lambda: make_skirting_board(constants, room_meshes, t.Subpart.SupportSurface),
+        lambda: make_skirting_board(
+            constants,
+            room_meshes,
+            t.Subpart.SupportSurface,
+            keep_rooms=visible_rooms,
+        ),
     )
     p.run_stage(
         "skirting_ceiling",
-        lambda: make_skirting_board(constants, room_meshes, t.Subpart.Ceiling),
+        lambda: make_skirting_board(
+            constants, room_meshes, t.Subpart.Ceiling, keep_rooms=visible_rooms
+        ),
     )
 
     rooms_meshed = butil.get_collection("placeholders:room_meshes")
@@ -547,16 +559,6 @@ def compose_indoors(
         use_chance=False,
     )
     p.run_stage(
-        "room_ceiling_beams",
-        lambda: room_dec.room_ceiling_beams(
-            rooms_split["ceiling"].objects,
-            constants,
-            material_seed=overrides.get("material_seed", scene_seed + 3100),
-        ),
-        prereq="room_ceilings",
-        use_chance=False,
-    )
-    p.run_stage(
         "room_cable_trunks",
         lambda: room_dec.room_cable_trunks(
             rooms_split["wall"].objects,
@@ -601,6 +603,24 @@ def compose_indoors(
         bbox=solved_bbox,
         use_chance=False,
     )
+
+    # Both run last: fixture transforms are still being adjusted by later
+    # stages, so clamping earlier was undone, and the beams have to be
+    # carved against the positions the fittings actually end up at.
+    p.run_stage(
+        "room_ceiling_beams",
+        lambda: room_dec.room_ceiling_beams(
+            rooms_split["ceiling"].objects,
+            constants,
+            keep_rooms=visible_rooms,
+            material_seed=overrides.get("material_seed", scene_seed + 3100),
+        ),
+        prereq="room_ceilings",
+        use_chance=False,
+    )
+    # After the beams, so the run has already been shortened to fit under the
+    # soffit and the hole is cut at the height the bowl finally sits at.
+    p.run_stage("inset_sinks", room_dec.inset_sinks, use_chance=False)
 
     p.run_stage(
         "hide_other_rooms",
@@ -666,6 +686,17 @@ def compose_indoors(
                         area.spaces.active.region_3d.view_perspective = "CAMERA"
                         break
                 break
+
+    # Absolutely last: later stages were still nudging ceiling fittings
+    # outward, undoing an earlier clamp.
+    p.run_stage(
+        "clamp_ceiling_fixtures",
+        lambda: room_dec.clamp_ceiling_fixtures(
+            rooms_split["ceiling"].objects, keep_rooms=visible_rooms
+        ),
+        prereq="room_ceilings",
+        use_chance=False,
+    )
 
     p.save_results(output_folder / "pipeline_coarse.csv")
 

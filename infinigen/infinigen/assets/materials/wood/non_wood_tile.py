@@ -9,7 +9,10 @@ from infinigen.assets.materials.wood.wood import shader_wood
 
 
 class NonWoodTile:
-    def generate(self, shader_func=None, shape=None):
+    # **kwargs so this drops in wherever ceramic.Tile is used: wall assignment
+    # passes vertical/alternating/scale through, and a bare (shader_func, shape)
+    # signature raised TypeError there.
+    def generate(self, shader_func=None, shape=None, **kwargs):
         shader_funcs = tile.get_shader_funcs()
         shader_funcs = [(f, w) for f, w in shader_funcs if f != shader_wood]
         funcs, weights = zip(*shader_funcs)
@@ -19,6 +22,6 @@ class NonWoodTile:
         if shape is None:
             shape = np.random.choice(["square", "hexagon", "rectangle"])
 
-        return tile.Tile().generate(shader_func=shader_func, shape=shape)
+        return tile.Tile().generate(shader_func=shader_func, shape=shape, **kwargs)
 
     __call__ = generate

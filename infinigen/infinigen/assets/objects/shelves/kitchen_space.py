@@ -202,8 +202,18 @@ class KitchenSpaceFactory(AssetFactory):
                 dimensions = Vector(
                     (
                         uniform(0.7, 1),
-                        uniform(1.7, 5),
-                        uniform(2.3, 2.5),
+                        # A single 5 m run is a mansion's kitchen, and in a
+                        # flat it monopolises the only wall long enough to take
+                        # it - which left no room for the oven, so the solver
+                        # placed the oven and gave up on the counter entirely.
+                        uniform(1.6, 3.0),
+                        # Wall units stop under the downstand beam. The beam
+                        # soffit sits at ceiling - 0.24..0.32, so from a
+                        # finished floor that is 2.39 m of headroom at worst;
+                        # 2.3-2.5 drove the cabinet tops and the hood straight
+                        # into the beam. _clamp_kitchen_runs_under_beams takes
+                        # up whatever a low ceiling still leaves over.
+                        uniform(2.15, 2.35),
                     )
                 )
 
@@ -221,15 +231,29 @@ class KitchenSpaceFactory(AssetFactory):
 
     def create_placeholder(self, **kwargs) -> bpy.types.Object:
         x, y, z = self.dimensions
-        box = new_bbox(
-            -x / 2 * 1.08, x / 2 * 1.08, 0, y, 0, self.cabinet_bottom_height + 0.13
-        )
+        # Exactly the asset's own depth. The 1.08 made the placeholder 8%
+        # deeper than the run it stands for, and since the solver seats the
+        # placeholder against the wall the cabinets ended up floating 4% of
+        # their depth - 30 to 40 mm - off the plaster.
+        box = new_bbox(-x / 2, x / 2, 0, y, 0, self.cabinet_bottom_height + 0.13)
         surface.add_geomod(box, nodegroup_tag_cube, apply=True)
 
         if not self.island:
-            box_top = new_bbox(
-                -x / 2, x * 0.16, 0, y, z - self.cabinet_top_height - 0.1, z
+            # Keep the wall-unit box clear of the base box. With a lower run
+            # (z 2.15) and a tall wall unit (1.0) the two overlapped, and the
+            # joined placeholder became self-intersecting - which made every
+            # attempt to place the run invalid, so a kitchen could finish with
+            # no counter at all.
+            top_lo = max(
+                z - self.cabinet_top_height - 0.1,
+                self.cabinet_bottom_height + 0.14,
             )
+            # Held a few mm forward of the base box's back face. The 1.08
+            # above used to keep the two boxes from sharing a plane; with the
+            # placeholder trimmed to the real depth they became coplanar, and a
+            # joined box with a doubled back face has no single tagged back for
+            # stable_against to seat on - every placement attempt was rejected.
+            box_top = new_bbox(-x / 2 + 0.005, x * 0.16, 0, y, top_lo, z)
             box = butil.join_objects([box, box_top])
 
         return box
@@ -270,14 +294,49 @@ class KitchenSpaceFactory(AssetFactory):
                 y - cabinet_top_width,
                 z - cabinet_top_height,
             )
+            bpy.context.view_layer.update()
+
+            # Wall units grow past the requested width (side boards, doors), so
+            # the real gap is smaller than top_mid_width + 0.1. Sizing the hood
+            # from the requested gap is what drove it into the left carcass.
+            left_max_y = max(
+                (cabinet_top_left.matrix_world @ Vector(c)).y
+                for c in cabinet_top_left.bound_box
+            )
+            right_min_y = min(
+                (cabinet_top_right.matrix_world @ Vector(c)).y
+                for c in cabinet_top_right.bound_box
+            )
+            gap = right_min_y - left_max_y
+            clearance = 0.03
+            hood_width = gap - 2 * clearance
+            if hood_width < 0.45:
+                hood_width = max(0.35, gap - 0.016)
+            hood_y = (left_max_y + right_min_y) / 2.0
 
             range_hood_factory = RangeHoodFactory(
                 self.factory_seed,
-                dimensions=(x * 0.66, top_mid_width + 0.15, cabinet_top_height),
+                dimensions=(x * 0.66, hood_width, cabinet_top_height),
             )
             top_mid = range_hood_factory(i=0)
             range_hood_factory.finalize_assets([top_mid])
-            top_mid.location = (-x * 0.5, y / 2.0, z - cabinet_top_height + 0.05)
+            # The hood mesh runs from its own origin forward in +x, so placing
+            # the origin on the wall line (-x/2) seats its back against the
+            # wall and its canopy over the hob.
+            top_mid.location = (-x * 0.5, hood_y, z - cabinet_top_height + 0.05)
+            bpy.context.view_layer.update()
+            hood_ys = [
+                (top_mid.matrix_world @ Vector(c)).y for c in top_mid.bound_box
+            ]
+            hy0, hy1 = min(hood_ys), max(hood_ys)
+            overlap_l = (left_max_y + clearance) - hy0
+            overlap_r = hy1 - (right_min_y - clearance)
+            span = hy1 - hy0
+            trim = max(0.0, overlap_l) + max(0.0, overlap_r)
+            if trim > 1e-4 and span > 0.3:
+                top_mid.scale.y *= max(0.35, span - trim) / span
+                top_mid.location.y = hood_y
+                butil.apply_transform(top_mid)
 
             hob = CooktopFactory(self.factory_seed).spawn_asset(0)
             hob.location = (0.0, y / 2.0, cabinet_bottom_height + 0.05)
@@ -291,6 +350,15 @@ class KitchenSpaceFactory(AssetFactory):
         if not self.island:
             kitchen_space.dimensions = self.dimensions
         butil.apply_transform(kitchen_space)
+
+        if not self.island:
+            # Seat the back of the run on the wall line. `dimensions` scales
+            # about the origin, not the bounding box, so the fit above leaves
+            # the carcass a centimetre or so shy of -x/2 - which reads as the
+            # units standing off the plaster.
+            corners = [kitchen_space.matrix_world @ Vector(v) for v in kitchen_space.bound_box]
+            kitchen_space.location.x += -x / 2 - min(c.x for c in corners)
+            butil.apply_transform(kitchen_space)
 
         tagging.tag_system.relabel_obj(kitchen_space)
 

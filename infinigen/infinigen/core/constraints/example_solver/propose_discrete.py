@@ -219,6 +219,15 @@ def propose_addition(
             # bounds with low=None are supposed to cap other bounds, not introduce new objects
             continue
 
+        if bound.high is not None and len(objkeys_in_dom(bound.domain, curr)) >= bound.high:
+            # Already at the cap. Adding one more can only raise the violation
+            # count, and metrop_hastings_with_viol rejects any move that does,
+            # so the proposal can never be accepted - but searching for a pose
+            # for it still costs the full move budget. A kitchen island capped
+            # at zero was burning 15-20 s a step this way, most of the large
+            # stage.
+            continue
+
         fac_options = lookup_generator(preds=bound.domain.tags)
         if len(fac_options) == 0:
             if bound.low is None or bound.low == 0:

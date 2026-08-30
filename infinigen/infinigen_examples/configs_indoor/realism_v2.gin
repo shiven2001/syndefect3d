@@ -19,17 +19,29 @@
 # See REALISM_IMPROVEMENTS.md for validation and pilot re-render workflow.
 
 # --- Lighting ---
-configure_render_cycles.exposure = 2.20
+# 2.20 rendered a bedroom at mean brightness 189 against a 160-176 measured on
+# the real Roboflow set; 1.45 lands at ~170. Saturation is deliberately left
+# near 1.0: the real set's mean saturation of 16-20 comes from close-up crops
+# of painted wall, and pulling a wide room down to that number turns the
+# parquet grey without making anything more photographic.
+configure_render_cycles.exposure = 1.45
 nishita_lighting.strength = 0.24
 nishita_lighting.sun_elevation = ("clip_gaussian", 22, 10, 8, 40)
-nishita_lighting.sun_size_deg = ("clip_gaussian", 2.4, 0.7, 1.2, 4.5)
+# The sun subtends ~0.53 deg. Nishita treats sunlight as a parallel beam for
+# exactly that reason; 2.4 deg was an unphysical softening.
+nishita_lighting.sun_size_deg = ("clip_gaussian", 0.53, 0.06, 0.45, 0.75)
 nishita_lighting.sun_intensity = ("uniform", 0.55, 0.75)
 nishita_lighting.air_density = ("clip_gaussian", 1.15, 0.15, 0.85, 1.4)
 nishita_lighting.dust_density = ("clip_gaussian", 1.35, 0.25, 0.8, 2.0)
-add_multi_directional_sun_lighting.n_directions = 3
+# No extra sun lamps. Nishita already carries both daylight terms - direct
+# attenuated sunlight and integrated sky light - so an added lamp is a second
+# sun in a sky that has one, from an azimuth (2*pi*i/n, i.e. 0 for n=1) that is
+# unrelated to where the sky's sun is. Measured: removing it moved mean
+# brightness by 0.8, while the window's mullion shadow came back.
+add_multi_directional_sun_lighting.n_directions = 0
 add_multi_directional_sun_lighting.elevation_deg = 28.0
-add_multi_directional_sun_lighting.energy_per_sun = 0.42
-add_multi_directional_sun_lighting.sun_angle_deg = 5.5
+add_multi_directional_sun_lighting.energy_per_sun = 1.6
+add_multi_directional_sun_lighting.sun_angle_deg = 0.53
 compose_indoors.lights_off_chance = 0.0
 compose_indoors.terrain_enabled = False
 populate_doors.all_closed = True
@@ -47,8 +59,10 @@ add_camera_based_lighting.enabled = False
 apply_realism_adjustments.refresh_room_surfaces = True
 dull_interior_floors.enabled = True
 soften_existing_lights.enabled = True
-soften_existing_lights.sun_angle_deg = 5.5
-soften_existing_lights.sun_energy = 0.42
+soften_existing_lights.sun_angle_deg = 0.53
+# Blends coarsed before n_directions went to 0 still carry their sun lamps;
+# zeroing the energy here makes an old blend render like a new one.
+soften_existing_lights.sun_energy = 0.0
 configure_photo_cycles.enabled = True
 restore_ceiling_fixture_visibility.enabled = True
 

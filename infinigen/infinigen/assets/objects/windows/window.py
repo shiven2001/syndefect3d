@@ -148,6 +148,18 @@ class WindowFactory(AssetFactory):
             width, height, frame_thickness = dimensions
         frame_width = U(0.02, 0.05) * min(min(width, height), 2)
 
+        if dimensions is not None:
+            # `dimensions` is the opening this window has to fill. The node tree
+            # lays the frame section half inside and half outside Width/Height,
+            # so Width is the frame's centre line, not its outer edge: passing
+            # the opening straight through built a window exactly FrameWidth too
+            # big in each direction, overhanging the reveal by FrameWidth/2 all
+            # round. That is 16-19 mm on a typical flat window and it scales
+            # with the opening, which is why some came out visibly misaligned
+            # and others did not.
+            width = max(width - frame_width, 2 * frame_width)
+            height = max(height - frame_width, 2 * frame_width)
+
         panel_width = min(U(0.8, 1.5), width)
         panel_height = min(U(panel_width, 3), height)
         panel_v_amount = max(width // panel_width, 1)

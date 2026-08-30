@@ -64,6 +64,8 @@ leftright = {
 
 on_floor = cl.StableAgainst(bottom, floortags, margin=0.01)
 flush_wall = cl.StableAgainst(back, walltags, margin=0.02)  # For wall decorations
+# Walk-in shower / similar wet-room fixtures: mixer and head sit on the wall.
+flush_fixture = cl.StableAgainst(back, walltags, margin=0.002)
 flush_wall_defect = cl.StableAgainst(
     back, walltags, margin=0.001
 )  # Nearly flush (1mm) for defects only

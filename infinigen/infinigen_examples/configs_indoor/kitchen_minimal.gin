@@ -2,6 +2,9 @@
 # Spawns: counters (with hob + range hood), sink + deck mixer
 # NO fridge / oven / dishwasher / counter clutter
 
+# Photo-like lighting, materials and compositing, same as the dry-room configs.
+include 'infinigen_examples/configs_indoor/realism_v2.gin'
+
 # Use single room configuration
 BlueprintSolidifier.enable_open=False
 
@@ -16,7 +19,19 @@ restrict_solving.restrict_parent_rooms=["Kitchen"]
 # This removes kitchen_appliance, kitchen_barchairs, and counter clutter
 # Keeps: kitchen_counters, kitchen_island_placement, kitchen_sink
 # Also keeps: defects, AC, wall plugs, light switches
-restrict_solving.consgraph_filters=["kitchen_counter", "kitchen_island", "kitchen_sink", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ceiling_lights", "ac_units", "wall_plugs", "light_switches"]
+restrict_solving.consgraph_filters=["kitchen_counter", "kitchen_island", "kitchen_sink", "kitchen_appliance", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ceiling_lights", "ac_units", "wall_plugs", "light_switches"]
+
+# No island: a flat kitchen has nowhere to put one (the placement rule needs
+# >2 m of clear floor all round), so every large-solve step was spent proposing
+# an island and rejecting it at ~30 s a go - most of a ~50 minute coarse pass.
+home_furniture_constraints.kitchen_island_enabled = False
+
+# Built-in oven only. A flat is handed over with the cooking appliances fitted;
+# the fridge, dishwasher and microwave come with whoever moves in.
+home_furniture_constraints.kitchen_oven_enabled = True
+home_furniture_constraints.kitchen_dishwasher_enabled = False
+home_furniture_constraints.kitchen_fridge_enabled = False
+home_furniture_constraints.kitchen_microwave_enabled = False
 
 # Disable terrain and other features
 compose_indoors.terrain_enabled = False

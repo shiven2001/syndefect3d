@@ -154,3 +154,4 @@ cython_debug/
 ###################################################
 
 /infinigen/outputs/
+references/

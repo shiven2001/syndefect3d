@@ -10,6 +10,7 @@ import numpy as np
 from numpy.random import uniform
 
 from infinigen.assets.materials.wood.plywood import get_shelf_material
+from infinigen.assets.objects.shelves.doors import cabinet_handle_chrome
 from infinigen.core import surface
 from infinigen.core.nodes import node_utils
 from infinigen.core.nodes.node_wrangler import Nodes, NodeWrangler
@@ -377,70 +378,89 @@ def nodegroup_kallax_drawer_frame(nw: NodeWrangler):
     "nodegroup_door_knob", singleton=False, type="GeometryNodeTree"
 )
 def nodegroup_door_knob(nw: NodeWrangler):
-    # Code generated using version 2.6.4 of the node_transpiler
+    """Horizontal D-handle on a drawer front: two posts + a bar along X."""
 
     group_input = nw.new_node(
         Nodes.GroupInput,
         expose_input=[
-            ("NodeSocketFloat", "Radius", 0.0040),
-            ("NodeSocketFloat", "length", 0.5000),
+            ("NodeSocketFloat", "Radius", 0.0055),
+            ("NodeSocketFloat", "length", 0.0200),
             ("NodeSocketFloat", "z", 0.5000),
+            ("NodeSocketFloat", "width", 0.5000),
+            ("NodeSocketFloat", "bar_span", 0.1280),
         ],
     )
 
-    add = nw.new_node(
-        Nodes.Math, input_kwargs={0: group_input.outputs["length"], 1: 0.0000}
+    radius = group_input.outputs["Radius"]
+    standoff = group_input.outputs["length"]
+    span = group_input.outputs["bar_span"]
+
+    mid_z = nw.new_node(
+        Nodes.Math,
+        input_kwargs={0: group_input.outputs["z"], 1: 0.5000},
+        attrs={"operation": "MULTIPLY"},
+    )
+    half_standoff = nw.new_node(
+        Nodes.Math, input_kwargs={0: standoff, 1: 0.5000}, attrs={"operation": "MULTIPLY"}
+    )
+    half_span = nw.new_node(
+        Nodes.Math, input_kwargs={0: span, 1: 0.5000}, attrs={"operation": "MULTIPLY"}
+    )
+    x_lo = nw.new_node(
+        Nodes.Math,
+        input_kwargs={0: half_span, 1: -1.0000},
+        attrs={"operation": "MULTIPLY"},
     )
 
-    cylinder = nw.new_node(
+    def _post(x_sock):
+        cyl = nw.new_node(
+            "GeometryNodeMeshCylinder",
+            input_kwargs={"Vertices": 24, "Radius": radius, "Depth": standoff},
+        )
+        pos = nw.new_node(
+            Nodes.CombineXYZ,
+            input_kwargs={"X": x_sock, "Y": half_standoff, "Z": mid_z},
+        )
+        return nw.new_node(
+            Nodes.Transform,
+            input_kwargs={
+                "Geometry": cyl.outputs["Mesh"],
+                "Translation": pos,
+                "Rotation": (1.5708, 0.0000, 0.0000),
+            },
+        )
+
+    two_r = nw.new_node(
+        Nodes.Math, input_kwargs={0: radius, 1: 2.2000}, attrs={"operation": "MULTIPLY"}
+    )
+    bar_len = nw.new_node(Nodes.Math, input_kwargs={0: span, 1: two_r})
+    bar_radius = nw.new_node(
+        Nodes.Math, input_kwargs={0: radius, 1: 1.1500}, attrs={"operation": "MULTIPLY"}
+    )
+    bar = nw.new_node(
         "GeometryNodeMeshCylinder",
-        input_kwargs={
-            "Vertices": 64,
-            "Radius": group_input.outputs["Radius"],
-            "Depth": add,
-        },
+        input_kwargs={"Vertices": 24, "Radius": bar_radius, "Depth": bar_len},
     )
-
-    store_named_attribute = nw.new_node(
-        Nodes.StoreNamedAttribute,
-        input_kwargs={
-            "Geometry": cylinder.outputs["Mesh"],
-            "Name": "uv_map",
-            3: cylinder.outputs["UV Map"],
-        },
-        attrs={"data_type": "FLOAT_VECTOR", "domain": "CORNER"},
+    bar_pos = nw.new_node(
+        Nodes.CombineXYZ, input_kwargs={"Y": standoff, "Z": mid_z}
     )
-
-    multiply = nw.new_node(
-        Nodes.Math, input_kwargs={0: add}, attrs={"operation": "MULTIPLY"}
-    )
-
-    add_1 = nw.new_node(Nodes.Math, input_kwargs={0: multiply, 1: 0.0001})
-
-    add_2 = nw.new_node(
-        Nodes.Math, input_kwargs={0: group_input.outputs["z"], 1: 0.0000}
-    )
-
-    multiply_1 = nw.new_node(
-        Nodes.Math, input_kwargs={0: add_2}, attrs={"operation": "MULTIPLY"}
-    )
-
-    combine_xyz_2 = nw.new_node(
-        Nodes.CombineXYZ, input_kwargs={"Y": add_1, "Z": multiply_1}
-    )
-
-    transform_1 = nw.new_node(
+    bar_xf = nw.new_node(
         Nodes.Transform,
         input_kwargs={
-            "Geometry": store_named_attribute,
-            "Translation": combine_xyz_2,
-            "Rotation": (1.5708, 0.0000, 0.0000),
+            "Geometry": bar.outputs["Mesh"],
+            "Translation": bar_pos,
+            "Rotation": (0.0000, 1.5708, 0.0000),
         },
     )
 
-    group_output = nw.new_node(
+    joined = nw.new_node(
+        Nodes.JoinGeometry,
+        input_kwargs={"Geometry": [_post(x_lo), _post(half_span), bar_xf]},
+    )
+    smooth = nw.new_node(Nodes.SetShadeSmooth, input_kwargs={"Geometry": joined})
+    nw.new_node(
         Nodes.GroupOutput,
-        input_kwargs={"Geometry": transform_1},
+        input_kwargs={"Geometry": smooth},
         attrs={"is_active_output": True},
     )
 
@@ -547,12 +567,17 @@ def geometry_nodes(nw: NodeWrangler, **kwargs):
     knob_length = nw.new_node(Nodes.Value, label="knob_length")
     knob_length.outputs[0].default_value = kwargs["knob_length"]
 
+    bar_span = nw.new_node(Nodes.Value, label="bar_span")
+    bar_span.outputs[0].default_value = kwargs.get("bar_span", 0.128)
+
     door_knob = nw.new_node(
         nodegroup_door_knob().name,
         input_kwargs={
             "Radius": knob_radius,
             "length": knob_length,
             "z": drawer_board_height,
+            "width": drawer_board_width,
+            "bar_span": bar_span,
         },
     )
 
@@ -580,21 +605,34 @@ def geometry_nodes(nw: NodeWrangler, **kwargs):
     side_tilt_width = nw.new_node(Nodes.Value, label="side_tilt_width")
     side_tilt_width.outputs[0].default_value = kwargs["side_tilt_width"]
 
-    join_geometry = nw.new_node(
+    join_carcass = nw.new_node(
         Nodes.JoinGeometry,
-        input_kwargs={"Geometry": [door_knob, drawer_door_board, kallax_drawer_frame]},
+        input_kwargs={"Geometry": [drawer_door_board, kallax_drawer_frame]},
     )
 
     set_material_2 = nw.new_node(
         Nodes.SetMaterial,
         input_kwargs={
-            "Geometry": join_geometry,
+            "Geometry": join_carcass,
             "Material": kwargs["drawer_material"],
         },
     )
 
+    set_material_knob = nw.new_node(
+        Nodes.SetMaterial,
+        input_kwargs={
+            "Geometry": door_knob,
+            "Material": kwargs.get("knob_material") or kwargs["drawer_material"],
+        },
+    )
+
+    join_geometry = nw.new_node(
+        Nodes.JoinGeometry,
+        input_kwargs={"Geometry": [set_material_2, set_material_knob]},
+    )
+
     realize_instances = nw.new_node(
-        Nodes.RealizeInstances, input_kwargs={"Geometry": set_material_2}
+        Nodes.RealizeInstances, input_kwargs={"Geometry": join_geometry}
     )
 
     triangulate = nw.new_node(
@@ -637,25 +675,31 @@ class CabinetDrawerBaseFactory(AssetFactory):
         if params.get("side_tilt_width", None) is None:
             params["side_tilt_width"] = uniform(0.02, 0.03)
         if params.get("knob_radius", None) is None:
-            params["knob_radius"] = uniform(0.003, 0.006)
+            params["knob_radius"] = uniform(0.005, 0.0065)
         if params.get("knob_length", None) is None:
-            params["knob_length"] = uniform(0.018, 0.035)
+            params["knob_length"] = uniform(0.018, 0.024)
+        if params.get("bar_span", None) is None:
+            params["bar_span"] = min(
+                uniform(0.096, 0.144), params["drawer_board_width"] * 0.55
+            )
 
         if params.get("drawer_material", None) is None:
             params["drawer_material"] = np.random.choice(
                 ["white", "black_wood", "wood"], p=[0.5, 0.2, 0.3]
             )
         if params.get("knob_material", None) is None:
-            params["knob_material"] = np.random.choice(
-                [params["drawer_material"], "metal"], p=[0.5, 0.5]
-            )
+            params["knob_material"] = cabinet_handle_chrome()
 
         params = self.get_material_func(params)
         return params
 
     def get_material_func(self, params, randomness=True):
         params["drawer_material"] = get_shelf_material(params["drawer_material"])
-        params["knob_material"] = get_shelf_material(params["knob_material"])
+        km = params.get("knob_material")
+        if isinstance(km, str) or km is None:
+            params["knob_material"] = cabinet_handle_chrome()
+        else:
+            params["knob_material"] = get_shelf_material(km)
 
         return params
 

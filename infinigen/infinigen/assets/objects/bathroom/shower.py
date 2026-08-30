@@ -19,6 +19,7 @@ from infinigen.assets.objects.wall_decorations.primitives import (
 from infinigen.assets.utils.object import join_objects, new_bbox
 from infinigen.core.placement.factory import AssetFactory
 from infinigen.core.util import blender as butil
+from infinigen.assets.objects.bathroom.fittings import bathroom_chrome
 from infinigen.core.util.math import FixedSeed
 
 
@@ -43,12 +44,7 @@ class ShowerStallFactory(AssetFactory):
         return new_bbox(-self.size, 0, 0, self.width, 0, max(self.glass_h, self.head_z))
 
     def create_asset(self, **params):
-        chrome = solid_material(
-            f"ShowerChrome_{self.factory_seed}",
-            (0.74, 0.75, 0.77),
-            roughness=0.10,
-            metallic=1.0,
-        )
+        chrome = bathroom_chrome()
         acrylic = solid_material(
             f"ShowerTray_{self.factory_seed}",
             (0.93, 0.935, 0.94),
@@ -182,12 +178,14 @@ class ShowerStallFactory(AssetFactory):
             shade_smooth(stub)
             parts.append(stub)
 
-        # Mixer on the tiled back wall (~1100 mm AFF).
-        mix_x = x_wall + 0.010
+        # Mixer on the tiled back wall (~1100 mm AFF). Back face of the plate
+        # sits on the placeholder's min-X so flush_fixture leaves no gap.
+        plate_t = 0.012
+        mix_x = x_wall + plate_t / 2
         mix_y = w * 0.42
         mix_plate = cylinder(
             0.055,
-            0.012,
+            plate_t,
             location=(mix_x, mix_y, self.mixer_z),
             rotation=(0, np.pi / 2, 0),
             name="shower_mixer_plate",
@@ -228,8 +226,8 @@ class ShowerStallFactory(AssetFactory):
         parts.append(arm)
         flange = cylinder(
             0.024,
-            0.012,
-            location=(x_wall + 0.008, arm_y, self.head_z),
+            plate_t,
+            location=(x_wall + plate_t / 2, arm_y, self.head_z),
             rotation=(0, np.pi / 2, 0),
             name="shower_flange",
         )
@@ -271,6 +269,8 @@ class ShowerStallFactory(AssetFactory):
             parts.append(hole)
 
         # Handheld on a slide rail — typical apartment fit-out.
+        cap_t = 0.012
+        cap_x = x_wall + cap_t / 2
         rail_x = x_wall + 0.018
         rail_y = w * 0.18
         slider = cylinder(
@@ -285,8 +285,8 @@ class ShowerStallFactory(AssetFactory):
         for zz in (0.92, 1.64):
             cap = cylinder(
                 0.016,
-                0.012,
-                location=(rail_x, rail_y, zz),
+                cap_t,
+                location=(cap_x, rail_y, zz),
                 rotation=(0, np.pi / 2, 0),
                 name="shower_slider_cap",
             )

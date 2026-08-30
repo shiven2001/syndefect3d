@@ -75,7 +75,10 @@ def shader_brick(nw: NodeWrangler, height=None, **kwargs):
         input_kwargs={"Roughness": roughness, "Base Color": color},
     )
     displacement = nw.new_node(
-        Nodes.Displacement, input_kwargs={"Height": offset, "Scale": 0.12}
+        Nodes.Displacement,
+        # Midlevel defaults to 0.5, which displaces the surface by -0.5*Scale
+        # along its normal regardless of Height.
+        input_kwargs={"Height": offset, "Scale": 0.12, "Midlevel": 0.0},
     )
     nw.new_node(
         Nodes.MaterialOutput,

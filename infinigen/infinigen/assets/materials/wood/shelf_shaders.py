@@ -4,6 +4,7 @@
 # Authors: Beining Han
 # Acknowledgement: This file draws inspiration from https://www.youtube.com/watch?v=jDEijCwz6to by Lachlan Sarv
 
+import bpy
 import numpy as np
 from numpy.random import normal, uniform
 
@@ -107,7 +108,11 @@ def shader_shelves_black_wood(nw: NodeWrangler, **kwargs):
     params["rgb"] = [uniform(0.015, 0.035), uniform(0.0, 0.01), uniform(0.0, 0.01)]
     params["roughness"] = uniform(0.75, 1.0)
 
-    kwargs.update(params)
+    # Caller-supplied values win. This used to be kwargs.update(params), which
+    # overwrote them with fresh randoms, so pinning a palette across the parts
+    # of one cabinet was impossible.
+    params.update(kwargs)
+    kwargs = params
 
     texture_coordinate_1 = nw.new_node(Nodes.TextureCoord)
     wave_scale = kwargs.get("wave_scale", 2.0)
@@ -256,7 +261,8 @@ def shader_shelves_black_wood(nw: NodeWrangler, **kwargs):
 
 
 def shader_shelves_black_wood_z(nw: NodeWrangler, **kwargs):
-    shader_shelves_black_wood(nw, z_axis_texture=True)
+    kwargs["z_axis_texture"] = True
+    shader_shelves_black_wood(nw, **kwargs)
 
 
 def shader_shelves_wood(nw: NodeWrangler, **kwargs):
@@ -268,7 +274,11 @@ def shader_shelves_wood(nw: NodeWrangler, **kwargs):
     params["wave_scale"] = uniform(1.0, 3.0)
     params["roughness"] = uniform(0.75, 1.0)
 
-    kwargs.update(params)
+    # Caller-supplied values win. This used to be kwargs.update(params), which
+    # overwrote them with fresh randoms, so pinning a palette across the parts
+    # of one cabinet was impossible.
+    params.update(kwargs)
+    kwargs = params
 
     texture_coordinate_1 = nw.new_node(Nodes.TextureCoord)
     wave_scale = kwargs.get("wave_scale", 2.0)
@@ -408,10 +418,18 @@ def shader_shelves_wood(nw: NodeWrangler, **kwargs):
 
 
 def shader_shelves_wood_z(nw: NodeWrangler, **kwargs):
-    shader_shelves_wood(nw, z_axis_texture=True)
+    # kwargs were being dropped here, so a pinned palette never reached the
+    # vertical-grain variant and the two halves of a cabinet came out in
+    # different timbers.
+    kwargs["z_axis_texture"] = True
+    shader_shelves_wood(nw, **kwargs)
 
 
 def get_shelf_material(name, **kwargs):
+    # Already a material: hand it straight back, rather than falling through to
+    # `case _` and drawing a fresh random finish.
+    if isinstance(name, bpy.types.Material):
+        return name
     match name:
         case "white":
             shader_func = np.random.choice(

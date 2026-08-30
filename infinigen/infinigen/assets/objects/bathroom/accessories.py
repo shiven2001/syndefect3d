@@ -8,6 +8,7 @@ from infinigen.assets.objects.wall_decorations.primitives import (
     box,
     cylinder,
     mirror_material,
+    plastic_material,
     shade_smooth,
     solid_material,
 )
@@ -18,73 +19,107 @@ from infinigen.core.util.math import FixedSeed
 
 
 class ExhaustFanFactory(AssetFactory):
-    """Ceiling extractor: square louver grille or round axial face (~160–220 mm)."""
+    """Ceiling extractor: square louver grille or round axial face (~240–300 mm)."""
 
     def __init__(self, factory_seed, coarse=False):
         super().__init__(factory_seed, coarse=coarse)
         with FixedSeed(factory_seed):
-            self.round = uniform() < 0.4
-            self.size = uniform(0.16, 0.22)
-            self.thick = uniform(0.018, 0.028)
-            self.n_slats = int(uniform(6, 10))
-            tone = uniform(0.90, 0.97)
-            self.color = (tone, tone, tone * 0.98)
+            # Flats fit a square louvred grille; the round axial face is rare.
+            self.round = uniform() < 0.15
+            self.size = uniform(0.24, 0.30)
+            # Sits nearly flush, like a ceiling light.
+            self.thick = uniform(0.010, 0.014)
+            self.n_slats = int(uniform(12, 17))
+            # Slight set so the slots read, without raking the blades into the ceiling.
+            self.tilt = uniform(0.18, 0.26)
+            tone = uniform(0.90, 0.96)
+            self.color = (tone, tone, tone * 0.985)
 
     def create_placeholder(self, **params):
-        s = self.size / 2
-        return new_bbox(-s, s, -s, s, -self.thick - 0.002, 0.002)
+        s = self.size / 2 + 0.010
+        return new_bbox(-s, s, -s, s, -self.thick - 0.004, 0.002)
+
+    def _louver(self, length, width, thick, y, z, mat, name="exhaust_slat"):
+        """Tilt a slat about its own centre, then move it into the grille."""
+        slat = box((length, width, thick), location=(0.0, 0.0, 0.0), name=name)
+        slat.rotation_euler = (self.tilt, 0.0, 0.0)
+        butil.apply_transform(slat)
+        slat.location = (0.0, y, z)
+        butil.apply_transform(slat, loc=True)
+        assign(slat, mat)
+        return slat
 
     def create_asset(self, **params):
-        body = solid_material(
+        body = plastic_material(
             f"ExhaustBody_{self.factory_seed}", self.color, roughness=0.36
         )
         dark = solid_material(
-            f"ExhaustSlot_{self.factory_seed}", (0.10, 0.10, 0.10), roughness=0.55
+            f"ExhaustSlot_{self.factory_seed}", (0.12, 0.12, 0.13), roughness=0.72
         )
         s, t = self.size, self.thick
         parts = []
+        flange = s * 0.08
+        outer = s / 2 + 0.010
+        opening = 2 * (outer - flange)
+        # Overlapping louvers: the dark well only shows as thin slots.
+        n = self.n_slats
+        pitch = opening / n
+        slat_w = pitch * 1.08
+        slat_z = -t * 0.40
+
         if self.round:
-            frame = cylinder(s / 2, t, location=(0, 0, -t / 2), name="exhaust_frame")
-            assign(frame, body)
-            shade_smooth(frame)
-            parts.append(frame)
-            well = cylinder(s * 0.38, 0.006, location=(0, 0, -t + 0.004), name="exhaust_well")
+            well = cylinder(
+                outer - flange * 0.15,
+                0.003,
+                location=(0, 0, -0.003),
+                name="exhaust_plenum",
+            )
             assign(well, dark)
             parts.append(well)
-            hub = cylinder(s * 0.10, 0.008, location=(0, 0, -t * 0.40), name="exhaust_hub")
+            ring = cylinder(outer, t, location=(0, 0, -t / 2), name="exhaust_flange")
+            hole = cylinder(
+                outer - flange, t * 3, location=(0, 0, -t / 2), name="exhaust_cut"
+            )
+            butil.modify_mesh(ring, "BOOLEAN", object=hole, operation="DIFFERENCE")
+            butil.delete(hole)
+            assign(ring, body)
+            shade_smooth(ring)
+            parts.append(ring)
+            R = outer - flange
+            for i in range(n):
+                y = -opening / 2 + pitch * (i + 0.5)
+                if abs(y) >= R * 0.98:
+                    continue
+                half = 2.0 * float(np.sqrt(max(R * R - y * y, 1e-8))) * 0.96
+                parts.append(self._louver(half, slat_w, 0.0024, y, slat_z, body))
+            hub = cylinder(R * 0.12, 0.004, location=(0, 0, slat_z), name="exhaust_hub")
             assign(hub, body)
             shade_smooth(hub)
             parts.append(hub)
-            for i in range(self.n_slats):
-                ang = i * (np.pi / self.n_slats)
-                slat = box(
-                    (s * 0.72, 0.004, 0.007),
-                    location=(0, 0, -t * 0.42),
-                    name=f"exhaust_slat_{i}",
-                )
-                slat.rotation_euler[2] = ang
-                butil.apply_transform(slat, loc=True)
-                assign(slat, body)
-                parts.append(slat)
         else:
-            frame = box((s, s, t), location=(0, 0, -t / 2), name="exhaust_frame")
-            assign(frame, body)
-            butil.modify_mesh(frame, "BEVEL", width=0.004, segments=2)
-            parts.append(frame)
-            inset = s * 0.78
-            well = box((inset, inset, 0.006), location=(0, 0, -t + 0.004), name="exhaust_well")
+            well = box(
+                (opening * 0.98, opening * 0.98, 0.003),
+                location=(0, 0, -0.003),
+                name="exhaust_plenum",
+            )
             assign(well, dark)
             parts.append(well)
-            slat_w = inset / (self.n_slats + 1)
-            for i in range(self.n_slats):
-                y = -inset / 2 + slat_w * (i + 1)
-                slat = box(
-                    (inset * 0.90, 0.004, 0.007),
-                    location=(0, y, -t * 0.45),
-                    name=f"exhaust_slat_{i}",
+            for dx, dy, sx, sy in (
+                (0, outer - flange / 2, 2 * outer, flange),
+                (0, -(outer - flange / 2), 2 * outer, flange),
+                (outer - flange / 2, 0, flange, 2 * outer - 2 * flange),
+                (-(outer - flange / 2), 0, flange, 2 * outer - 2 * flange),
+            ):
+                piece = box((sx, sy, t), location=(dx, dy, -t / 2), name="exhaust_flange")
+                butil.modify_mesh(piece, "BEVEL", width=0.0015, segments=2)
+                assign(piece, body)
+                parts.append(piece)
+            for i in range(n):
+                y = -opening / 2 + pitch * (i + 0.5)
+                parts.append(
+                    self._louver(opening * 0.98, slat_w, 0.0024, y, slat_z, body)
                 )
-                assign(slat, body)
-                parts.append(slat)
+
         obj = join_objects(parts)
         obj.name = f"ExhaustFanFactory({self.factory_seed}).fan"
         return obj
@@ -98,7 +133,10 @@ class FloorDrainFactory(AssetFactory):
         with FixedSeed(factory_seed):
             self.round = uniform() < 0.35
             self.size = uniform(0.10, 0.13)
-            self.thick = 0.008
+            # A floor gully is set into the screed. The body used to be ~50 mm
+            # deep while the placeholder claimed 8 mm, so the solver stood the
+            # whole thing on the floor instead of letting it sit flush.
+            self.thick = 0.006
             self.n = int(uniform(5, 8))
 
     def create_placeholder(self, **params):
@@ -113,50 +151,69 @@ class FloorDrainFactory(AssetFactory):
             metallic=1.0,
         )
         dark = solid_material(
-            f"DrainHole_{self.factory_seed}", (0.05, 0.05, 0.05), roughness=0.7
+            f"DrainHole_{self.factory_seed}", (0.03, 0.03, 0.035), roughness=0.85
         )
         s, t = self.size, self.thick
-        # on_floor uses a 1 cm margin; sink the grille so it sits ~2 mm proud.
-        z = -0.008
+        # Everything lives in a thin slab just above the floor plane: the floor
+        # is a plane with no thickness, so anything modelled below it would be
+        # hidden anyway, and a deep body just lifts the grate off the tiles.
+        z = t / 2
         parts = []
+
+        # Shallow dark pan right under the bars, which is what gives the grate
+        # its openings - a solid rim over a buried sump read as a steel tile.
+        sump_r = s * 0.40
         if self.round:
-            frame = cylinder(s / 2, t, location=(0, 0, z), name="drain_frame")
-            assign(frame, steel)
-            shade_smooth(frame)
-            parts.append(frame)
-            well = cylinder(s * 0.38, t * 0.5, location=(0, 0, z - 0.002), name="drain_well")
-            assign(well, dark)
-            parts.append(well)
+            sump = cylinder(sump_r, 0.002, location=(0, 0, 0.001), name="drain_sump")
+        else:
+            sump = box((s * 0.80, s * 0.80, 0.002), location=(0, 0, 0.001), name="drain_sump")
+        assign(sump, dark)
+        parts.append(sump)
+
+        rim_w = s * 0.10
+        if self.round:
+            outer = cylinder(s / 2, t, location=(0, 0, z), name="drain_rim")
+            inner = cylinder(s / 2 - rim_w, t * 3, location=(0, 0, z), name="drain_rim_cut")
+            butil.modify_mesh(outer, "BOOLEAN", object=inner, operation="DIFFERENCE")
+            butil.delete(inner)
+            assign(outer, steel)
+            shade_smooth(outer)
+            parts.append(outer)
+            span = s - 2 * rim_w
             for i in range(self.n):
-                ang = i * (np.pi / self.n)
                 bar = box(
-                    (s * 0.72, 0.004, t * 0.7),
-                    location=(0, 0, z + 0.001),
+                    (span, 0.0045, t * 0.8),
+                    location=(0, 0, z + 0.0005),
                     name="drain_bar",
                 )
-                bar.rotation_euler[2] = ang
+                bar.rotation_euler[2] = i * (np.pi / self.n)
                 butil.apply_transform(bar, loc=True)
                 assign(bar, steel)
                 parts.append(bar)
         else:
-            frame = box((s, s, t), location=(0, 0, z), name="drain_frame")
-            assign(frame, steel)
-            butil.modify_mesh(frame, "BEVEL", width=0.0015, segments=2)
-            parts.append(frame)
-            inner = s * 0.76
-            well = box((inner, inner, t * 0.5), location=(0, 0, z - 0.002), name="drain_well")
-            assign(well, dark)
-            parts.append(well)
-            bar_w = 0.004
-            for i in range(self.n):
-                y = -inner / 2 + inner * (i + 0.5) / self.n
+            # Four border pieces leave the sump visible between the slats.
+            for dx, dy, sx, sy in (
+                (0, (s - rim_w) / 2, s, rim_w),
+                (0, -(s - rim_w) / 2, s, rim_w),
+                ((s - rim_w) / 2, 0, rim_w, s - 2 * rim_w),
+                (-(s - rim_w) / 2, 0, rim_w, s - 2 * rim_w),
+            ):
+                piece = box((sx, sy, t), location=(dx, dy, z), name="drain_rim")
+                butil.modify_mesh(piece, "BEVEL", width=0.0012, segments=2)
+                assign(piece, steel)
+                parts.append(piece)
+            span = s - 2 * rim_w
+            pitch = span / self.n
+            for i in range(self.n - 1):
+                y = -span / 2 + pitch * (i + 1)
                 bar = box(
-                    (inner * 0.90, bar_w, t * 0.7),
-                    location=(0, y, z + 0.001),
+                    (span, 0.0045, t * 0.8),
+                    location=(0, y, z + 0.0005),
                     name="drain_bar",
                 )
                 assign(bar, steel)
                 parts.append(bar)
+
         obj = join_objects(parts)
         obj.name = f"FloorDrainFactory({self.factory_seed}).drain"
         return obj

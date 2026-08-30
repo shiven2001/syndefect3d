@@ -14,7 +14,10 @@ from infinigen.assets.materials.wood.plywood import (
     shader_shelves_wood,
     shader_shelves_wood_z,
 )
-from infinigen.assets.objects.shelves.doors import CabinetDoorBaseFactory
+from infinigen.assets.objects.shelves.doors import (
+    CabinetDoorBaseFactory,
+    cabinet_handle_chrome,
+)
 from infinigen.assets.objects.shelves.drawers import CabinetDrawerBaseFactory
 from infinigen.assets.objects.shelves.large_shelf import LargeShelfBaseFactory
 from infinigen.assets.utils.object import new_bbox
@@ -101,6 +104,70 @@ def geometry_nodes(nw: NodeWrangler, **kwargs):
     )
 
 
+
+def _shared_cabinet_materials():
+    """One cabinet finish for the whole flat.
+
+    Every KitchenSpaceFactory instance used to sample its own finish, so runs of
+    units along the same kitchen came out in different woods. Cached by material
+    name so all cabinets in a blend agree.
+    """
+    frame = bpy.data.materials.get("KitchenCabinetFrame")
+    board = bpy.data.materials.get("KitchenCabinetBoard")
+    if frame is None or board is None:
+        # Fitted kitchens are timber or painted; the black-stained option read
+        # as neither.
+        if np.random.uniform() < 0.7:
+            # One palette, drawn once and handed to both halves. Carcass and
+            # door fronts are the same board in a real kitchen; letting each
+            # shader draw its own HSVs is what made the units two-tone. Only
+            # the grain direction differs - upright on the stiles, along the
+            # length on the horizontal boards.
+            # One hue and one saturation across all three ramp stops, so the
+            # board reads as a single timber. The stock ranges run to
+            # saturation 1.0 at value 1.0, which is salmon pink, not oak -
+            # cabinet veneer is a low-chroma warm brown.
+            hue = uniform(0.055, 0.095)
+            sat = uniform(0.22, 0.42)
+            palette = {
+                "bright_hsv": [hue, sat * 0.7, uniform(0.55, 0.78)],
+                "mid_hsv": [hue, sat, uniform(0.26, 0.40)],
+                "dark_hsv": [hue, min(1.0, sat * 1.1), uniform(0.09, 0.17)],
+                "wave_scale": uniform(1.0, 3.0),
+                "roughness": uniform(0.55, 0.8),
+            }
+            frame = surface.shaderfunc_to_material(shader_shelves_wood_z, **palette)
+            board = surface.shaderfunc_to_material(shader_shelves_wood, **palette)
+        else:
+            frame = surface.shaderfunc_to_material(shader_shelves_white)
+            board = surface.shaderfunc_to_material(shader_shelves_white)
+        frame.name = "KitchenCabinetFrame"
+        board.name = "KitchenCabinetBoard"
+    return frame, board
+
+
+def _cabinet_chrome():
+    """Chrome for door and drawer pulls, shared like the carcass finish."""
+    return cabinet_handle_chrome()
+
+
+_HANDLE_PARAMS = None
+
+
+def _cabinet_handle_params():
+    """One pull spec for the whole kitchen, matching a fitted run of units."""
+    global _HANDLE_PARAMS
+    if _HANDLE_PARAMS is None:
+        r = uniform(0.005, 0.0065)
+        _HANDLE_PARAMS = {
+            "knob_R": r,
+            "knob_radius": r,
+            "knob_length": uniform(0.018, 0.023),
+            "bar_span": uniform(0.112, 0.144),
+        }
+    return _HANDLE_PARAMS
+
+
 class KitchenCabinetBaseFactory(AssetFactory):
     def __init__(self, factory_seed, params={}, coarse=False):
         super(KitchenCabinetBaseFactory, self).__init__(factory_seed, coarse=coarse)
@@ -119,12 +186,16 @@ class KitchenCabinetBaseFactory(AssetFactory):
 
     def get_material_params(self):
         with FixedSeed(self.factory_seed):
-            params = {}
-            params["frame_material"] = np.random.choice(
-                ["white", "black_wood", "wood"], p=[0.4, 0.3, 0.3]
-            )
-            params["board_material"] = params["frame_material"]
-            return self.get_material_func(params, randomness=True)
+            frame, board = _shared_cabinet_materials()
+            chrome = _cabinet_chrome()
+            return {
+                "frame_material": frame,
+                "board_material": board,
+                "panel_material": frame,
+                # Pulls are metal, not another slab of the carcass timber.
+                "knob_material": chrome,
+                "drawer_material": board,
+            }
 
     def get_material_func(self, params, randomness=True):
         with FixedSeed(self.factory_seed):
@@ -155,7 +226,8 @@ class KitchenCabinetBaseFactory(AssetFactory):
                 )
 
             params["panel_material"] = params["frame_material"]
-            params["knob_material"] = params["board_material"]
+            if not isinstance(params.get("knob_material"), bpy.types.Material):
+                params["knob_material"] = _cabinet_chrome()
             params["drawer_material"] = params["board_material"]
             return params
 
@@ -210,6 +282,14 @@ class KitchenCabinetBaseFactory(AssetFactory):
                 - self.frame_params["division_board_z_translation"][0]
                 + self.frame_params["division_board_thickness"]
             )
+            handle = _cabinet_handle_params()
+            params.update(handle)
+            # Base run (drawer_only): reach the pull from standing, upper third.
+            # Wall units: lower third, under the bottom rail.
+            params["knob_height_frac"] = (
+                0.72 if getattr(self, "drawer_only", False) else 0.28
+            )
+            params["bar_span"] = min(handle["bar_span"], params["door_height"] * 0.40)
             params.update(self.material_params.copy())
             param_sets.append(params)
         elif attach_type == "drawer":
@@ -231,6 +311,11 @@ class KitchenCabinetBaseFactory(AssetFactory):
                         self.frame_params["division_board_thickness"] / 2.0
                         + self.frame_params["division_board_z_translation"][i]
                     ),
+                )
+                handle = _cabinet_handle_params()
+                params.update(handle)
+                params["bar_span"] = min(
+                    handle["bar_span"], params["drawer_board_width"] * 0.55
                 )
                 params.update(self.material_params.copy())
                 param_sets.append(params)
@@ -268,9 +353,10 @@ class KitchenCabinetBaseFactory(AssetFactory):
             if drawer_only:
                 attach_type = np.random.choice(["drawer", "door"], p=[0.5, 0.5])
             else:
-                attach_type = np.random.choice(
-                    ["drawer", "door", "none"], p=[0.4, 0.4, 0.2]
-                )
+                # Every wall unit in a fitted kitchen has a front. "none" left
+                # an open carcass mid-run, which reads as missing geometry
+                # rather than as an open shelf.
+                attach_type = np.random.choice(["drawer", "door"], p=[0.25, 0.75])
 
             attach_params = self.get_attach_params(attach_type, i=i)
             if attach_type == "door":

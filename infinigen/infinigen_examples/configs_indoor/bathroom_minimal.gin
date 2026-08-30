@@ -3,6 +3,9 @@
 # NO secondary objects (no bottles, towels, etc.)
 # NO storage (no shelves)
 
+# Photo-like lighting, materials and compositing, same as the dry-room configs.
+include 'infinigen_examples/configs_indoor/realism_v2.gin'
+
 # Use single room configuration
 BlueprintSolidifier.enable_open=False
 
@@ -12,13 +15,16 @@ restrict_solving.restrict_parent_rooms=["Bathroom"]
 
 # Don't restrict primary/secondary children - let the constraint graph do it
 # The bathroom constraint requires: Mirror, Sink, Toilet
-# We'll use consgraph_filters to keep only bathroom fixtures
+# We'll use consgraph_filters to keep only bathroom fixtures.
+# wall_decorations is kept so mirrors retain their clearance from the door
+# casing. Stating that clearance inline in constraints["bathroom"] instead
+# cost ~128s per solver move.
 
 # Filter constraint graph to ONLY bathroom fixture constraints
-# Keeps: bathroom (toilet+sink+mirror), toilet, bathtub, shower, vanity, exhaust, drain, TP, medicine, defects, ceiling_lights, wall_plugs, faucets
+# Keeps: bathroom (toilet+sink+mirror), toilet, bathtub, shower, vanity, exhaust, drain, TP, medicine, defects, ceiling_lights (exactly 1 via bathroom_ceiling_lights), wall_plugs, faucets
 # Removes: storage-related constraints
 # Note: AC units are excluded for bathrooms (not in filters)
-restrict_solving.consgraph_filters=["bathroom", "toilet", "bathtub", "showers", "vanities", "exhaust_fans", "floor_drains", "medicine_cabinets", "toilet_paper", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ceiling_lights", "wall_plugs", "faucets", "light_switches"]
+restrict_solving.consgraph_filters=["wall_decorations", "bathroom", "toilet", "bathtub", "showers", "vanities", "exhaust_fans", "floor_drains", "medicine_cabinets", "toilet_paper", "cracks", "paint_peel", "wall_bubbles", "paint_runs", "paint_patches", "weak_leak_stain", "ceiling_lights", "wall_plugs", "faucets", "light_switches"]
 
 # Disable terrain and other features
 compose_indoors.terrain_enabled = False
@@ -52,3 +58,8 @@ populate_doors.door_chance = 1.0
 execute_tasks.generate_resolution = (1024, 1024)
 get_sensor_coords.H = 1024
 get_sensor_coords.W = 1024
+
+# Fixtures held back for now (see home_furniture_constraints toggles).
+home_furniture_constraints.bathroom_vanity_enabled = False
+home_furniture_constraints.bathroom_wall_faucet_enabled = False
+home_furniture_constraints.bathroom_toilet_paper_enabled = False

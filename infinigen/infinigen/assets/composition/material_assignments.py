@@ -64,6 +64,14 @@ metals = [
     (metal.BrushedBlackMetal, 0.3),
 ]
 
+# Cooker hoods, splash-backs and similar appliance faces: stainless only. The
+# general `metals` list includes galvanized and hammered finishes, which look
+# right on ironmongery and wrong on a kitchen appliance.
+appliance_steel = [
+    (metal.MetalBasic, 3.0),
+    (metal.BrushedMetal, 2.0),
+]
+
 metal_neutral = [
     # TODO: override parameters to be mostly black/white
     (metal.MetalBasic, 1.0),
@@ -304,7 +312,7 @@ wall = [(ceramic.Plaster, 1.0)]
 # Wet rooms: mostly painted plaster; tiles ~2/10 so defects stay on paint, not grout.
 kitchen_wall = [
     (ceramic.Plaster, 8.0),
-    (ceramic.Tile, 2.0),
+    (wood.NonWoodTile, 2.0),
 ]
 garage_wall = [
     (ceramic.Concrete, 5.0),
@@ -322,7 +330,7 @@ balcony_wall = [
 ]
 bathroom_wall = [
     (ceramic.Plaster, 8.0),
-    (ceramic.Tile, 2.0),
+    (wood.NonWoodTile, 2.0),
 ]
 warehouse_wall = [
     (ceramic.Concrete, 5.0),
@@ -350,8 +358,11 @@ utility_floor = [
     (ceramic.Plaster, 1.0),
     (ceramic.Tile, 1.0),
 ]
+# ceramic.Tile draws its base shader at random and shader_wood carries a third
+# of that weight, so a plain Tile floor came out wood-grained in a third of
+# bathrooms. NonWoodTile is the same tiling with that option removed.
 bathroom_floor = [
-    (ceramic.Tile, 1.0),
+    (wood.NonWoodTile, 1.0),
 ]
 balcony_floor = bathroom_floor
 office_floor = wood_tiles + [(fabric.Rug, 1.0)]

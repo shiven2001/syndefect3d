@@ -26,9 +26,11 @@ class DoorCasingFactory(AssetFactory):
             if constants is None:
                 constants = RoomConstants()
             self.constants = constants
-            # ~90-150 mm of architrave standing ~15-25 mm off the wall.
+            # ~90-150 mm of architrave.
             self.margin = constants.door_size * uniform(0.04, 0.065)
-            self.extrude = uniform(0.012, 0.025)
+            # Architrave stands proud of the skirting (20-50 mm) so the board
+            # dies into it instead of poking past its face.
+            self.extrude = uniform(0.032, 0.052)
             self.bevel_all_sides = uniform() < 0.3
             self.surface = wood.InteriorWood()
             self.metal_color = colors.metal_hsv()

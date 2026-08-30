@@ -155,12 +155,27 @@ def overhead_view(cam, room_name):
 def hide_other_rooms(
     state, rooms_split, keep_rooms: list[str], film_transparent: bool = False
 ):
-    for col in rooms_split.values():
-        for o in col.objects:
+    def _hide_unkept(objs):
+        for o in list(objs):
             if any(roomname.split(".")[0] in o.name for roomname in keep_rooms):
                 continue
             o.hide_viewport = True
             o.hide_render = True
+
+    for col in rooms_split.values():
+        _hide_unkept(col.objects)
+
+    # Beams and skirting live in their own collections, so hiding room meshes
+    # alone left the rest of the apartment's cornice and downstands in camera.
+    extra_cols = (
+        "skirting",
+        "unique_assets:ceiling_beams",
+        "unique_assets:room_ceiling",
+    )
+    for name in extra_cols:
+        col = bpy.data.collections.get(name)
+        if col is not None:
+            _hide_unkept(col.objects)
 
     hide_cutters = [
         o
@@ -176,6 +191,29 @@ def hide_other_rooms(
     for o in hide_cutters:
         o.hide_render = True
         o.hide_viewport = True
+
+    # Ceiling fittings are named after their factory, not their room, so hiding
+    # room meshes left hallway/bedroom lights hanging in empty space outside
+    # the room that is actually on camera.
+    keep_stems = {roomname.split(".")[0] for roomname in keep_rooms}
+    for os in state.objs.values():
+        if os.obj is None:
+            continue
+        if not any(
+            "CeilingLight" in n or "ExhaustFan" in n
+            for n in [os.obj.name, *(c.name for c in butil.iter_object_tree(os.obj))]
+        ):
+            continue
+        hosts = set()
+        for rel in os.relations:
+            hosts.add(rel.target_name.split(".")[0])
+            parent = state.objs.get(rel.target_name)
+            if parent is not None and parent.obj is not None:
+                hosts.add(parent.obj.name.split(".")[0])
+        if hosts and not hosts.intersection(keep_stems):
+            for o in butil.iter_object_tree(os.obj):
+                o.hide_render = True
+                o.hide_viewport = True
     # If False, world background (Nishita sky / HDR) shows through windows; if True, background is transparent (black).
     bpy.context.scene.render.film_transparent = film_transparent
 

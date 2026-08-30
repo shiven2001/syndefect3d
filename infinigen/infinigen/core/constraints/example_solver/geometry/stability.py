@@ -143,7 +143,18 @@ def stable_against(
     )
 
     if projected_a is None or projected_b is None:
-        raise ValueError(f"Invalid {projected_a=} {projected_b=}")
+        # trimesh returns None when a mesh will not project onto the plane at
+        # this pose (degenerate/edge-on outlines). That means this candidate
+        # placement is invalid, which is exactly what the caller is asking; the
+        # upstream `raise` aborted the whole run instead, so one unlucky
+        # proposal during annealing killed the scene.
+        logger.warning(
+            "stable_against: could not project %s onto %s (%s); rejecting move",
+            obj_name,
+            relation_state.target_name,
+            "a" if projected_a is None else "b",
+        )
+        return False
 
     if allow_overhangs:
         res = projected_a.overlaps(projected_b)

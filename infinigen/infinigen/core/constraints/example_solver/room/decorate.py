@@ -528,7 +528,10 @@ def populate_windows(
         butil.put_in_collection(list(butil.iter_object_tree(window)), col)
 
         window.parent = cutter
-        window.location[1] = -constants.wall_thickness / 2
+        # Seated in the reveal, not stuck on the face of it. -Y is the room
+        # side; putting the frame's centre plane on the wall face left half the
+        # section standing proud of the plaster.
+        window.location[1] = -constants.wall_thickness / 2 + frame_thick / 2
         window.rotation_euler[1] = np.pi
         windows.append(window)
         factory.finalize_assets(windows)
@@ -544,12 +547,15 @@ def populate_windows(
         handle.parent = cutter
         handle.rotation_euler[2] = -np.pi / 2
         stile = 1.0 if uniform() < 0.5 else -1.0
+        # Centre of the stile, read off the frame width the factory actually
+        # drew rather than a fixed 24 mm guess that only matched some of them.
+        frame_width = factory.params.get("FrameWidth", 0.04)
         handle.location = (
-            stile * max(cutter_dims[0] / 2 - 0.024, 0.0),
-            # Sit the backplate on the room-side face of the frame. Offsetting
-            # from the frame's centre plane instead buried all but 2 mm of the
-            # handle inside the section.
-            -constants.wall_thickness / 2 - frame_thick / 2 - 0.002,
+            stile * max(cutter_dims[0] / 2 - frame_width / 2, 0.0),
+            # Backplate on the room-side face of the frame. Offsetting from the
+            # frame's centre plane instead buried all but 2 mm of the handle
+            # inside the section.
+            -constants.wall_thickness / 2 - 0.002,
             -cutter_dims[2] * uniform(0.02, 0.10),
         )
         butil.put_in_collection([handle], col)
@@ -807,16 +813,112 @@ def room_pillars(walls: list[bpy.types.Object], constants: RoomConstants):
 
 
 @gin.configurable
+def clamp_ceiling_fixtures(
+    ceilings,
+    enabled=True,
+    inset=0.40,
+    tokens=("CeilingLight", "ExhaustFan"),
+    keep_rooms=None,
+):
+    """Pull ceiling fittings back inside the room they are mounted in.
+
+    The constraint language has no containment predicate, and the obvious hard
+    rule - `distance(r, walltags) > 0.45` - is satisfied just as well by leaving
+    the room as by moving to the middle of it, so lights and extract fans ended
+    up straddling or beyond the wall line. `distance(r, ceilingtags)` does not
+    catch it either: just past the ceiling edge the nearest point on the ceiling
+    is still ~0 away. Clamping geometrically cannot fail, and the inset doubles
+    as clearance from the perimeter downstand beam.
+    """
+    if not enabled:
+        return
+
+    from mathutils import Vector
+
+    fixtures = [
+        o
+        for o in bpy.data.objects
+        if o.type == "MESH"
+        and any(t in o.name for t in tokens)
+        and len(o.data.vertices)
+        and not o.hide_render
+    ]
+    if not fixtures:
+        return
+
+    rooms = []
+    for ceiling in ceilings:
+        if not _room_is_kept(ceiling.name, keep_rooms):
+            continue
+        try:
+            poly = obj2polygon(ceiling)
+        except Exception as e:
+            logger.warning("ceiling clamp skipped for %s: %s", ceiling.name, e)
+            continue
+        if poly.is_empty or poly.area < 0.5:
+            continue
+        loc = ceiling.matrix_world.translation
+        poly = shapely.affinity.translate(poly, loc.x, loc.y)
+        inner = poly.buffer(-inset)
+        if inner.is_empty:  # room too small to inset; fall back to the outline
+            inner = poly
+        rooms.append((ceiling.name, poly, inner))
+
+    for o in fixtures:
+        # Use the mesh's own footprint, not matrix_world.translation: these
+        # fittings sit up to ~0.75 m off their origin, so testing the origin
+        # reported them safely inside while the visible disc hung past the wall.
+        corners = [o.matrix_world @ Vector(v) for v in o.bound_box]
+        x0 = min(v.x for v in corners)
+        x1 = max(v.x for v in corners)
+        y0 = min(v.y for v in corners)
+        y1 = max(v.y for v in corners)
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        pt = shapely.Point(cx, cy)
+
+        # A fitting that has drifted outside is no longer covered by its own
+        # room, so ownership is by nearest room rather than by containment.
+        # Do not skip far-away fittings: claim_dist used to leave lights that
+        # had gone through the wall sitting in empty space.
+        best = min(rooms, key=lambda r: r[1].distance(pt), default=None)
+        if best is None:
+            continue
+        name, _, inner = best
+
+        # Shrink by the fitting's own half-size so the whole disc lands inside.
+        half = max((x1 - x0) / 2, (y1 - y0) / 2)
+        target_region = inner.buffer(-half)
+        if target_region.is_empty:
+            target_region = inner
+        if target_region.covers(pt):
+            continue
+
+        target = shapely.ops.nearest_points(target_region, pt)[0]
+        o.location.x += target.x - cx
+        o.location.y += target.y - cy
+        logger.info(
+            "clamped %s into %s by %.2f m",
+            o.name.split("(")[0],
+            name,
+            ((target.x - cx) ** 2 + (target.y - cy) ** 2) ** 0.5,
+        )
+    bpy.context.view_layer.update()
+
+
+@gin.configurable
 def room_ceiling_beams(
     ceilings,
     constants=None,
     enabled=True,
-    depth=("uniform", 0.22, 0.40),
+    # Narrowed so fittings can be constrained to sit just clear of the
+    # soffit: the AC band below assumes a beam no deeper than 0.32.
+    depth=("uniform", 0.24, 0.32),
     width=("uniform", 0.16, 0.26),
     perimeter_chance=0.85,
     span_beam_chance=0.55,
     min_room_span=3.2,
     material_seed=1,
+    keep_rooms=None,
 ):
     """Downstand beams under the ceiling slab.
 
@@ -832,6 +934,9 @@ def room_ceiling_beams(
         constants = RoomConstants()
 
     col = butil.get_collection("unique_assets:ceiling_beams")
+    beam_objs = []
+    room_info = []
+    ceilings = [c for c in ceilings if _room_is_kept(c.name, keep_rooms)]
     with FixedSeed(material_seed):
         for ceiling in sorted(ceilings, key=lambda c: c.name):
             try:
@@ -851,6 +956,10 @@ def room_ceiling_beams(
             d = rg(depth)
             w = rg(width)
             z_top = loc.z
+            # Finished floor: the shell is built symmetrically about the storey,
+            # so half a wall thickness of slab sits at each end of wall_height.
+            floor_z = z_top - constants.wall_height + constants.wall_thickness
+            room_info.append((ceiling.name, poly, z_top - d, floor_z))
             parts = []
             for sub in polys:
                 if sub.area < 1.0:
@@ -865,6 +974,447 @@ def room_ceiling_beams(
             if mats:
                 surface.assign_material(obj, mats[0])
             butil.put_in_collection(obj, col)
+            beam_objs.append(obj)
+
+        _nudge_ceiling_fixtures_off_beams(beam_objs)
+        _snap_wall_fixture_heights(room_info)
+        _clamp_kitchen_runs_under_beams(room_info)
+        _push_runs_to_wall(room_info)
+        for obj in beam_objs:
+            _carve_beam_clearances(obj)
+
+
+def _escape_xy(fx0, fy0, fx1, fy1, bx0, by0, bx1, by1, margin):
+    """Shortest axis-aligned shift that separates a fixture AABB from a beam."""
+    options = (
+        (bx1 + margin - fx0, 0.0),
+        (bx0 - margin - fx1, 0.0),
+        (0.0, by1 + margin - fy0),
+        (0.0, by0 - margin - fy1),
+    )
+    return min(options, key=lambda d: abs(d[0]) + abs(d[1]))
+
+
+# Mounting heights are building convention, not a layout decision: sockets go
+# at 300 mm, switches at 1.3 m, the AC head just under the beam. Leaving them to
+# the solver is what produced sockets at 1.5 m and switches at 2.3 m - the pose
+# sampler draws uniformly over the whole wall, and by the time an object is
+# added the translate step is down to 1 cm, far too small to walk a metre.
+_WALL_FIXTURE_HEIGHTS = (
+    # token, reference, offset, which edge of the fixture the offset fixes
+    ("WallPlug", "floor", 0.30, "mid"),
+    ("WallSwitch", "floor", 1.30, "mid"),
+    ("SplitAC", "soffit", 0.02, "top"),
+)
+
+
+def _push_runs_to_wall(
+    rooms,
+    gap=0.005,
+    tokens=("KitchenSpaceFactory", "OvenFactory", "DishwasherFactory"),
+    claim=1.0,
+    max_push=0.25,
+):
+    """Scribe fitted joinery back to the wall it was solved against.
+
+    `against_wall` carries a 70 mm margin, which is a sofa's clearance, not a
+    kitchen unit's - it left a strip of floor behind the run with the worktop
+    hanging over nothing. Tightening the relation instead is not an option: at
+    5 mm the solver rejected every attempt to place the run and finished with
+    no counter at all. Closing the gap here cannot fail, because the object has
+    already been placed legally and only slides along its own back normal.
+    """
+    from mathutils import Vector
+
+    if not rooms:
+        return
+
+    for o in list(bpy.data.objects):
+        if o.type != "MESH" or not any(t in o.name for t in tokens):
+            continue
+        if not len(o.data.vertices) or "placeholder" in o.name:
+            continue
+        x0, y0, _, x1, y1, _ = _world_aabb(o)
+        pt = shapely.Point((x0 + x1) / 2, (y0 + y1) / 2)
+        name, foot, _, _ = min(rooms, key=lambda r: r[1].distance(pt))
+        if foot.distance(pt) > claim:
+            continue
+
+        # Free run to the wall on each side, measured only across the object's
+        # own footprint so a doorway elsewhere on the wall does not count.
+        probes = {
+            (1, 0): shapely.box(x1, y0, x1 + max_push + 1.0, y1),
+            (-1, 0): shapely.box(x0 - max_push - 1.0, y0, x0, y1),
+            (0, 1): shapely.box(x0, y1, x1, y1 + max_push + 1.0),
+            (0, -1): shapely.box(x0, y0 - max_push - 1.0, x1, y0),
+        }
+        best, best_free = None, None
+        for d, probe in probes.items():
+            inter = foot.intersection(probe)
+            if inter.is_empty:
+                free = 0.0
+            else:
+                bx0, by0, bx1, by1 = inter.bounds
+                free = (bx1 - x1) if d == (1, 0) else (
+                    x0 - bx0) if d == (-1, 0) else (
+                    by1 - y1) if d == (0, 1) else (y0 - by0)
+            if best_free is None or free < best_free:
+                best, best_free = d, free
+        if best is None or not (0.0 < best_free - gap <= max_push):
+            continue
+        push = best_free - gap
+        o.location.x += best[0] * push
+        o.location.y += best[1] * push
+        logger.info(
+            "scribed %s to the %s wall (%.3f m)", o.name.split("(")[0], name, push
+        )
+
+
+@gin.configurable
+def inset_sinks(enabled=True, proud=0.008, margin=0.004, edge=0.09):
+    """Drop kitchen sinks into the worktop instead of through it.
+
+    SinkFactory already builds a `Cutter` for the hole, and its placeholder is
+    only the rim slice, so the whole design assumes the bowl hangs below the
+    counter - but nothing ever applied the cutter. The bowl was left passing
+    straight through the slab and out the underside, with the rim standing
+    ~70 mm proud. Cutting the hole and then seating the rim on the surface is
+    what makes it read as an inset sink.
+    """
+    if not enabled:
+        return
+
+    from mathutils import Vector
+
+    cutters = [
+        o
+        for o in bpy.data.objects
+        if o.type == "MESH" and o.name.endswith(".cutter") and len(o.data.vertices)
+    ]
+    if not cutters:
+        return
+
+    counters = [
+        o
+        for o in bpy.data.objects
+        if o.type == "MESH"
+        and "KitchenSpaceFactory" in o.name
+        and "placeholder" not in o.name
+        and len(o.data.vertices)
+    ]
+    if not counters:
+        return
+
+    for cutter in cutters:
+        sink = cutter.parent
+        if sink is None:
+            continue
+        cx0, cy0, _, cx1, cy1, _ = _world_aabb(cutter)
+        if cx1 - cx0 < 1e-4:  # never placed; still sitting at the origin
+            continue
+        hit = None
+        for c in counters:
+            x0, y0, _, x1, y1, _ = _world_aabb(c)
+            if cx1 > x0 and cx0 < x1 and cy1 > y0 and cy0 < y1:
+                hit = c
+                break
+        if hit is None:
+            continue
+
+        # Seat the rim on the worktop before cutting, so the hole is made at
+        # the height the bowl finally sits at. The search is capped at the
+        # sink's own top: the wall cabinets hang directly over the bowl and are
+        # part of the same joined object, so an unbounded max picked their tops
+        # and threw the sink half a metre into the air.
+        _, _, sz0, _, _, sz1 = _world_aabb(sink)
+        heights = [
+            (hit.matrix_world @ v.co).z
+            for v in hit.data.vertices
+            if _within_xy(hit.matrix_world @ v.co, cx0, cy0, cx1, cy1)
+        ]
+        heights = [h for h in heights if sz0 - 0.05 < h < sz1 + 1e-4]
+        if not heights:
+            continue
+        dz = (max(heights) + proud) - sz1
+        # A worktop is never more than a few cm from where the solver already
+        # put the rim; anything larger means the reference is wrong.
+        if abs(dz) > 0.12:
+            logger.warning(
+                "inset_sinks: implausible %+.3f m for %s, leaving it alone",
+                dz, sink.name.split("(")[0],
+            )
+            dz = 0.0
+        if abs(dz) > 1e-4:
+            sink.location.z += dz
+            bpy.context.view_layer.update()
+
+        # Pull the bowl fully onto the worktop. StableAgainst only checks the
+        # rim slice that SinkFactory hands out as its placeholder, so the bowl
+        # underneath could hang 65 mm past the front edge - which is what made
+        # a drop-in sink read as a Belfast one with its apron on show.
+        hx0, hy0, _, hx1, hy1, _ = _world_aabb(hit)
+        sx0, sy0, _, sx1, sy1, _ = _world_aabb(sink)
+        dx = max(0.0, (hx0 + edge) - sx0) - max(0.0, sx1 - (hx1 - edge))
+        dy = max(0.0, (hy0 + edge) - sy0) - max(0.0, sy1 - (hy1 - edge))
+        if abs(dx) > 1e-4 or abs(dy) > 1e-4:
+            sink.location.x += dx
+            sink.location.y += dy
+            bpy.context.view_layer.update()
+            cx0 += dx
+            cx1 += dx
+            cy0 += dy
+            cy1 += dy
+            logger.info(
+                "pulled %s onto the worktop (%+.3f, %+.3f)",
+                sink.name.split("(")[0], dx, dy,
+            )
+
+        # A clean axis-aligned box over the cutter's footprint, grown a hair so
+        # the bowl walls do not z-fight the cut edge and run well past the slab
+        # top and bottom. Copying the cutter object and then assigning .scale
+        # after .matrix_world silently discarded its own transform, and the
+        # malformed operand made the boolean stretch the worktop into a 1.6 m
+        # slab standing in the middle of the room.
+        bx0, by0, bz0, bx1, by1, bz1 = _world_aabb(cutter)
+        # Well clear above the slab, barely below it: the hole only has to go
+        # through the worktop, and cutting deeper just carves the carcass.
+        lo, hi = bz0 - 0.02, bz1 + 0.3
+        operand = butil.spawn_cube()
+        operand.scale = (
+            (bx1 - bx0) / 2 + margin,
+            (by1 - by0) / 2 + margin,
+            (hi - lo) / 2,
+        )
+        operand.location = ((bx0 + bx1) / 2, (by0 + by1) / 2, (lo + hi) / 2)
+        butil.apply_transform(operand, loc=True)
+        butil.modify_mesh(hit, "BOOLEAN", object=operand, operation="DIFFERENCE")
+        butil.delete(operand)
+        logger.info(
+            "inset %s into %s (moved %+.3f m)", sink.name.split("(")[0], hit.name, dz
+        )
+
+
+def _within_xy(v, x0, y0, x1, y1):
+    return x0 <= v.x <= x1 and y0 <= v.y <= y1
+
+
+def _clamp_kitchen_runs_under_beams(rooms, gap=0.03, tokens=("KitchenSpace",), claim=1.0):
+    """Keep tall kitchen joinery clear of the downstand beam.
+
+    Wall units and the hood are sized at build time against a nominal ceiling,
+    but the beam depth is drawn after solving and the storey height varies, so
+    a run that fits one scene drives into the beam in another. Squeezing the
+    run in z is what a fitter does with a tall unit; the correction is a few
+    per cent and it only ever shrinks.
+    """
+    from mathutils import Vector
+
+    if not rooms:
+        return
+
+    for o in list(bpy.data.objects):
+        if o.type != "MESH" or not any(t in o.name for t in tokens):
+            continue
+        if not len(o.data.vertices) or "placeholder" in o.name:
+            continue
+        x0, y0, z0, x1, y1, z1 = _world_aabb(o)
+        pt = shapely.Point((x0 + x1) / 2, (y0 + y1) / 2)
+        name, foot, soffit, _ = min(rooms, key=lambda r: r[1].distance(pt))
+        if foot.distance(pt) > claim:
+            continue
+        limit = soffit - gap
+        if z1 <= limit or z1 - z0 < 1e-3:
+            continue
+        scale = (limit - z0) / (z1 - z0)
+        if scale <= 0:
+            continue
+        # Scale about the base so the plinth stays on the floor.
+        o.scale.z *= scale
+        o.location.z = z0 + (o.location.z - z0) * scale
+        logger.info(
+            "shortened %s to clear the %s beam soffit (x%.3f)",
+            o.name.split("(")[0], name, scale,
+        )
+
+
+def _snap_wall_fixture_heights(rooms, claim=1.0, margin=0.03):
+    """Set wall fittings to their real mounting heights, clear of openings.
+
+    `rooms` is (name, footprint, soffit_z, floor_z) per room. The solver still
+    chooses which wall and where along it; only the height is taken back, since
+    it is fixed by regulation rather than by the room. Anything that lands in a
+    doorway or window on the way down is slid sideways along its own wall.
+    """
+    if not rooms:
+        return
+
+    portals = [
+        _world_aabb(p)
+        for p in butil.get_collection("placeholders:portal_cutters").objects
+        if p.name.startswith(("door", "entrance", "window"))
+    ]
+
+    for o in list(bpy.data.objects):
+        if o.type != "MESH" or not len(o.data.vertices) or "placeholder" in o.name:
+            continue
+        spec = next(
+            (h for h in _WALL_FIXTURE_HEIGHTS if h[0] in o.name), None
+        )
+        if spec is None:
+            continue
+        _, ref, offset, edge = spec
+
+        x0, y0, z0, x1, y1, z1 = _world_aabb(o)
+        pt = shapely.Point((x0 + x1) / 2, (y0 + y1) / 2)
+        name, foot, soffit, floor_z = min(rooms, key=lambda r: r[1].distance(pt))
+        if foot.distance(pt) > claim:
+            continue
+
+        base = soffit if ref == "soffit" else floor_z
+        target = base - offset if ref == "soffit" else base + offset
+        dz = target - (z1 if edge == "top" else (z0 + z1) / 2)
+        if abs(dz) > 1e-4:
+            o.location.z += dz
+            z0 += dz
+            z1 += dz
+            logger.info(
+                "set %s to %s%+.2f m in %s (%+.2f m)",
+                o.name.split("(")[0], ref, offset, name, dz,
+            )
+
+        # Slide along the wall, never off it: a plate is thin in the wall
+        # normal, so the wide horizontal axis is the one it can travel on.
+        along_x = (x1 - x0) >= (y1 - y0)
+        for _ in range(6):
+            hit = next(
+                (
+                    p
+                    for p in portals
+                    if x1 + margin > p[0] and x0 - margin < p[3]
+                    and y1 + margin > p[1] and y0 - margin < p[4]
+                    and z1 + margin > p[2] and z0 - margin < p[5]
+                ),
+                None,
+            )
+            if hit is None:
+                break
+            if along_x:
+                opts = (hit[3] + margin - x0, hit[0] - margin - x1)
+            else:
+                opts = (hit[4] + margin - y0, hit[1] - margin - y1)
+            for d in sorted(opts, key=abs):
+                nx = (x0 + x1) / 2 + (d if along_x else 0)
+                ny = (y0 + y1) / 2 + (0 if along_x else d)
+                if foot.buffer(0.05).covers(shapely.Point(nx, ny)):
+                    break
+            else:
+                break
+            if along_x:
+                o.location.x += d
+                x0 += d
+                x1 += d
+            else:
+                o.location.y += d
+                y0 += d
+                y1 += d
+            logger.info(
+                "slid %s %.2f m clear of an opening", o.name.split("(")[0], d
+            )
+
+
+def _nudge_ceiling_fixtures_off_beams(beams, margin=0.05):
+    """Slide ceiling lights and extract fans off downstand beams.
+
+    Beams are generated after the solver, which only sees the ceiling slab, so
+    fittings land in the beam band. Moving the fitting is what a real layout
+    does; carving the beam is the fallback for wall-mounted objects.
+    """
+    tokens = ("CeilingLight", "ExhaustFan")
+    if not beams:
+        return
+    beam_aabbs = [_world_aabb(b) for b in beams]
+    for o in list(bpy.data.objects):
+        if o.type != "MESH" or not any(tok in o.name for tok in tokens):
+            continue
+        if not len(o.data.vertices):
+            continue
+        for _ in range(8):
+            x0, y0, z0, x1, y1, z1 = _world_aabb(o)
+            hit = None
+            for b in beam_aabbs:
+                bx0, by0, bz0, bx1, by1, bz1 = b
+                if x1 + margin <= bx0 or x0 - margin >= bx1:
+                    continue
+                if y1 + margin <= by0 or y0 - margin >= by1:
+                    continue
+                if z1 < bz0 or z0 > bz1:
+                    continue
+                hit = b
+                break
+            if hit is None:
+                break
+            dx, dy = _escape_xy(
+                x0, y0, x1, y1, hit[0], hit[1], hit[3], hit[4], margin
+            )
+            if abs(dx) + abs(dy) < 1e-6:
+                break
+            o.location.x += dx
+            o.location.y += dy
+            bpy.context.view_layer.update()
+
+
+# Fixtures that are mounted high enough to foul a downstand beam. Defect planes
+# are deliberately absent: they lie on the ceiling surface and carving the beam
+# around them would punch holes in it.
+_BEAM_CLEARANCE_TOKENS = (
+    "CeilingLight",
+    "ExhaustFan",
+    "MedicineCabinet",
+    "MirrorFactory",
+    "SplitAC",
+    "WallArt",
+    "WallShelf",
+    "CableTrunk",
+)
+
+
+def _world_aabb(obj):
+    from mathutils import Vector
+
+    cs = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
+    return (
+        min(c.x for c in cs), min(c.y for c in cs), min(c.z for c in cs),
+        max(c.x for c in cs), max(c.y for c in cs), max(c.z for c in cs),
+    )
+
+
+def _carve_beam_clearances(beam, margin=0.015):
+    """Notch the beam where a fixture already occupies the space.
+
+    Beams are built after the solver has placed everything, so a ceiling light,
+    extract fan or tall mirror can already be sitting where a beam wants to run.
+    Cutting the beam back is what a builder would do - the alternative is
+    geometry visibly passing through the fitting.
+    """
+    bx0, by0, bz0, bx1, by1, bz1 = _world_aabb(beam)
+    for o in list(bpy.data.objects):
+        if o.type != "MESH" or o is beam or not len(o.data.vertices):
+            continue
+        if not any(tok in o.name for tok in _BEAM_CLEARANCE_TOKENS):
+            continue
+        x0, y0, z0, x1, y1, z1 = _world_aabb(o)
+        if x1 < bx0 or x0 > bx1 or y1 < by0 or y0 > by1 or z1 < bz0 or z0 > bz1:
+            continue
+        cutter = butil.spawn_cube()
+        cutter.scale = (
+            (x1 - x0) / 2 + margin,
+            (y1 - y0) / 2 + margin,
+            (z1 - z0) / 2 + margin,
+        )
+        cutter.location = ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
+        butil.apply_transform(cutter, loc=True)
+        butil.modify_mesh(beam, "BOOLEAN", object=cutter, operation="DIFFERENCE")
+        butil.delete(cutter)
 
 
 def _beam_solids(poly, w, d, z_top, perimeter_chance, span_beam_chance, min_span):
@@ -937,6 +1487,16 @@ def _room_stem(name):
     if name.endswith((".wall", ".ceiling", ".floor")):
         return name.rsplit(".", 1)[0]
     return name.split(".")[0]
+
+
+def _room_is_kept(name, keep_rooms):
+    """True if this mesh belongs to a room that is still shown (singleroom).
+
+    ``keep_rooms is None`` means show every room (full-apartment generation).
+    """
+    if keep_rooms is None:
+        return True
+    return any(k.split(".")[0] in name for k in keep_rooms)
 
 
 def _is_tiled_surface(obj):

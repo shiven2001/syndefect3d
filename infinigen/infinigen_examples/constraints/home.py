@@ -383,7 +383,11 @@ def home_room_constraints(has_fewer_rooms=False):
                 lambda r: (r.area() / 5).log().hinge(0, 0.4).pow(2)
             )
             + rooms[Semantics.Bathroom].sum(
-                lambda r: (r.area() / 8).log().hinge(0, 0.4).pow(2)
+                # 8 m2 put the free band at 8-11.9 and rooms landed at its
+                # bottom, where a 1.5-2 m tub plus toilet and basin does not fit
+                # and the solver pushed the tub out through the wall. 10 shifts
+                # the band to 10-14.9.
+                lambda r: (r.area() / 10).log().hinge(0, 0.4).pow(2)
             )
             + rooms[Semantics.Utility].sum(
                 lambda r: (r.area() / 5).log().hinge(0, 0.4).pow(2)
@@ -509,6 +513,25 @@ def home_furniture_constraints(
     spalling_plug_count_max: int = 6,
     open_wiring_count_min: int = 1,
     open_wiring_count_max: int = 4,
+    # Per-fixture switches. "vanities" and "toilet_paper" cannot be dropped via
+    # restrict_solving.consgraph_filters, because that matches on substrings and
+    # the "toilet" / "bathroom" entries pull them straight back in.
+    bathroom_vanity_enabled: bool = True,
+    bathroom_wall_faucet_enabled: bool = True,
+    bathroom_toilet_paper_enabled: bool = True,
+    # An island needs >2 m of clear floor on every side. A flat-sized kitchen
+    # never has that, so the solver spends every large step proposing one and
+    # throwing it away - each proposal costs ~30 s, which is where a kitchen
+    # coarse pass loses most of its ~50 minutes. Left on by default; the flat
+    # configs turn it off, since galley kitchens are what they actually have.
+    kitchen_island_enabled: bool = True,
+    # A handover flat is fitted with the built-in cooking appliances and
+    # nothing else - the fridge, dishwasher and microwave arrive with the
+    # occupant. Split out so the flat configs can ask for the oven alone.
+    kitchen_oven_enabled: bool = True,
+    kitchen_dishwasher_enabled: bool = True,
+    kitchen_fridge_enabled: bool = True,
+    kitchen_microwave_enabled: bool = True,
 ):
     """Construct a constraint graph which incentivizes realistic home layouts.
 
@@ -708,20 +731,37 @@ def home_furniture_constraints(
             * walldec.related_to(r).all(lambda t: (t.distance(r, cu.floortags) > 0.6))
             * walldec.all(
                 lambda t: (
-                    (vertical_diff(t, r).abs() < 1.5) * (t.distance(cutters) > 0.1)
+                    (vertical_diff(t, r).abs() < 1.5)
+                    # The architrave stands ~100 mm proud of the opening on each
+                    # side, so 0.1 let mirrors and cabinets clip straight into
+                    # the door casing.
+                    * (t.distance(cutters) > 0.35)
                 )
             )
         )
     )
 
-    # Separate constraint for AC units (exclude bathrooms)
-    constraints["ac_units"] = rooms[-Semantics.Bathroom].all(
+    # Separate constraint for AC units. Bathrooms and kitchens are excluded:
+    # a kitchen's wall cabinets run right up into the band the head hangs in,
+    # so the unit could never be placed and every kitchen finished the wall
+    # stage one violation short. Flats put the AC in the living room and
+    # bedrooms anyway.
+    constraints["ac_units"] = rooms[-Semantics.Bathroom][-Semantics.Kitchen].all(
         lambda r: (
             ac_units.related_to(r).count().in_range(1, 1)
             * ac_units.related_to(r).all(
                 lambda t: (
-                    (t.distance(r, cu.floortags).in_range(2.40, 2.55))
-                    * (t.distance(cutters) > 1.0)
+                    # High on the wall. The band is deliberately wide and the
+                    # exact height is set afterwards by
+                    # _snap_wall_fixture_heights, which knows the beam depth
+                    # that was actually drawn: a tight band is a ~9% target for
+                    # a pose sampler that draws uniformly over the wall, so the
+                    # unit simply failed to be placed at all.
+                    (t.distance(r, cu.ceilingtags).in_range(0.25, 0.75))
+                    # Clear of the opening, not a metre from it - above the
+                    # window is where these are actually hung, and 1.0 m ruled
+                    # out every wall in a room with a window.
+                    * (t.distance(cutters) > 0.15)
                 )
             )
         )
@@ -735,7 +775,9 @@ def home_furniture_constraints(
             wall_plugs.related_to(r).count().in_range(2, 4)
             * wall_plugs.related_to(r).all(
                 lambda t: (
-                    (t.distance(r, cu.floortags).in_range(0.25, 0.45))
+                    # Wide band, exact height set by
+                    # _snap_wall_fixture_heights after solving.
+                    (t.distance(r, cu.floortags).in_range(0.15, 0.75))
                     * (t.distance(cutters) > 0.25)
                 )
             )
@@ -752,7 +794,9 @@ def home_furniture_constraints(
             light_switches.related_to(r).count().in_range(1, 1)
             * light_switches.related_to(r).all(
                 lambda t: (
-                    (t.distance(r, cu.floortags).in_range(1.15, 1.40))
+                    # Wide band, exact height set by
+                    # _snap_wall_fixture_heights after solving.
+                    (t.distance(r, cu.floortags).in_range(0.90, 1.70))
                     * (t.distance(cutters) > 0.16)
                 )
             )
@@ -762,10 +806,12 @@ def home_furniture_constraints(
     # Use similar logic to wall plugs (height from floor, clearance from cutters).
     constraints["faucets"] = rooms[Semantics.Bathroom].all(
         lambda r: (
-            faucets.related_to(r).count().in_range(1, 6)
+            faucets.related_to(r)
+            .count()
+            .in_range(0, 2 if bathroom_wall_faucet_enabled else 0)
             * faucets.related_to(r).all(
                 lambda t: (
-                    (t.distance(r, cu.floortags).in_range(0.6, 1.0))
+                    (t.distance(r, cu.floortags).in_range(0.6, 1.1))
                     * (t.distance(cutters) > 0.2)
                 )
             )
@@ -1000,7 +1046,7 @@ def home_furniture_constraints(
     )
 
     # Separate score term for AC units
-    score_terms["ac_units"] = rooms[-Semantics.Bathroom].mean(
+    score_terms["ac_units"] = rooms[-Semantics.Bathroom][-Semantics.Kitchen].mean(
         lambda r: (
             ac_units.related_to(r).mean(
                 lambda ac: (
@@ -1203,14 +1249,23 @@ def home_furniture_constraints(
     constraints["ceiling_lights"] = rooms.all(
         lambda r: (
             ceillights.related_to(r, cu.hanging).count().in_range(1, 4)
-            *             ceillights.related_to(r, cu.hanging).all(
-                lambda t: t.distance(r, cu.ceilingtags).in_range(0, 0.01)
+            * ceillights.related_to(r, cu.hanging).all(
+                lambda t: (
+                    t.distance(r, cu.ceilingtags).in_range(0, 0.01)
+                )
             )
         )
     )
+    # Keeping clear of the perimeter downstand beam (~16-26 cm) is a preference,
+    # not a hard rule. As a hard constraint `distance(walltags) > 0.45` was
+    # trivially satisfied by pushing the fitting straight out through the
+    # ceiling - outside the room it is very far from every wall - which is how
+    # lights ended up beyond the room bounds.
     score_terms["ceiling_lights"] = rooms.mean(
         lambda r: (
             (ceillights.count() / r.volume(dims=2)).hinge(0.08, 0.15).minimize(weight=5)
+            + ceillights.related_to(r, cu.hanging)
+            .mean(lambda t: t.distance(r, cu.walltags).hinge(0.45, 12).minimize(weight=12))
             + ceillights.related_to(r, cu.hanging)
             .mean(
                 lambda t: (
@@ -1328,6 +1383,9 @@ def home_furniture_constraints(
     kitchens = rooms[Semantics.Kitchen].excludes(cu.room_types)
 
     countertops = furniture[Semantics.KitchenCounter]
+    # Solved with the roomy margin: a tight one makes the run unplaceable
+    # (seed 3 rejected all 46 addition attempts and finished with no counter at
+    # all). _push_runs_to_wall closes the gap afterwards, where it cannot fail.
     wallcounter = countertops[shelves.KitchenSpaceFactory].related_to(
         rooms, cu.against_wall
     )
@@ -1337,7 +1395,9 @@ def home_furniture_constraints(
     constraints["kitchen_counters"] = kitchens.all(
         lambda r: (
             wallcounter.related_to(r).count().in_range(1, 2)
-            * island.related_to(r).count().in_range(0, 1)
+            * island.related_to(r)
+            .count()
+            .in_range(0, 1 if kitchen_island_enabled else 0)
         )
     )
 
@@ -1367,41 +1427,48 @@ def home_furniture_constraints(
         )
     )
 
-    constraints["kitchen_island_placement"] = kitchens.all(
-        lambda r: wallcounter.related_to(r).all(
-            lambda t: (t.distance(island.related_to(r)).in_range(0.7, 3))
-        )
-        * island.related_to(r).all(
-            lambda t: (
-                t.distance(wallcounter.related_to(r)).in_range(0.7, 3)
-                * (t.distance(r, cu.walltags) > 2)
+    # Only meaningful when there is an island to place: distance() against an
+    # empty set returns 0, which sits outside in_range(0.7, 3), so this scored
+    # a permanent violation in every island-free kitchen.
+    if kitchen_island_enabled:
+        constraints["kitchen_island_placement"] = kitchens.all(
+            lambda r: wallcounter.related_to(r).all(
+                lambda t: (t.distance(island.related_to(r)).in_range(0.7, 3))
             )
-        )
-    )
-
-    score_terms["kitchen_island_placement"] = kitchens.mean(
-        lambda r: (
-            island.mean(
+            * island.related_to(r).all(
                 lambda t: (
-                    cl.angle_alignment_cost(t, wallcounter)
-                    + cl.angle_alignment_cost(t, r, cu.walltags)
+                    t.distance(wallcounter.related_to(r)).in_range(0.7, 3)
+                    * (t.distance(r, cu.walltags) > 2)
                 )
-            ).minimize(weight=1)
-            + island.distance(r, cu.walltags).hinge(3, 1e7).minimize(weight=10)
-            + wallcounter.mean(
-                lambda t: cl.focus_score(t, island.related_to(r)).minimize(weight=5)
             )
         )
-    )
+
+        score_terms["kitchen_island_placement"] = kitchens.mean(
+            lambda r: (
+                island.mean(
+                    lambda t: (
+                        cl.angle_alignment_cost(t, wallcounter)
+                        + cl.angle_alignment_cost(t, r, cu.walltags)
+                    )
+                ).minimize(weight=1)
+                + island.distance(r, cu.walltags).hinge(3, 1e7).minimize(weight=10)
+                + wallcounter.mean(
+                    lambda t: cl.focus_score(t, island.related_to(r)).minimize(weight=5)
+                )
+            )
+        )
 
     sink_flush_on_counter = cl.StableAgainst(
         cu.bottom, {Subpart.SupportSurface}, margin=0.001
     )
     cl.StableAgainst(cu.back, cu.walltags, margin=0.1)
-    kitchen_sink = (
-        obj[Semantics.Sink][table_decorations.SinkFactory]
-        .related_to(countertops, sink_flush_on_counter)
-        .related_to(countertops, cu.front_coplanar_front)
+    # No front-coplanar relation: pinning the bowl to the front edge of the
+    # run turned an inset sink into a Belfast one, with the bowl's front wall
+    # standing proud below the worktop. StableAgainst already requires the
+    # sink's footprint to be contained by the support surface, which is what
+    # keeps a drop-in bowl inside the counter.
+    kitchen_sink = obj[Semantics.Sink][table_decorations.SinkFactory].related_to(
+        countertops, sink_flush_on_counter
     )
 
     constraints["kitchen_sink"] = kitchens.all(
@@ -1421,28 +1488,72 @@ def home_furniture_constraints(
         .related_to(wallcounter, cu.back_coplanar_back)
     )
 
-    constraints["kitchen_appliance"] = kitchens.all(
-        lambda r: (
-            kitchen_appliances_big[appliances.DishwasherFactory]
+    # Only the appliances that are switched on get a term. The block used to
+    # also carry `wallfurn[KitchenCabinetFactory].count() >= 0`, which
+    # constrains nothing but does declare a second run of cabinets in the same
+    # on-floor-and-wall domain as the counter - and that competition is what
+    # left seed 3's kitchen with an oven and no counter at all.
+    appliance_terms = []
+    if kitchen_dishwasher_enabled:
+        appliance_terms.append(
+            lambda r: kitchen_appliances_big[appliances.DishwasherFactory]
             .related_to(r)
             .count()
             .in_range(0, 1)
-            * kitchen_appliances_big[appliances.BeverageFridgeFactory]
-            .related_to(r)
-            .count()
-            .in_range(0, 1)
-            * (
-                kitchen_appliances_big[appliances.OvenFactory].related_to(r).count()
-                == 1
-            )
-            * (wallfurn[shelves.KitchenCabinetFactory].related_to(r).count() >= 0)
-            * (microwaves.related_to(wallcounter.related_to(r)).count().in_range(0, 1))
         )
-    )
+    if kitchen_fridge_enabled:
+        appliance_terms.append(
+            lambda r: kitchen_appliances_big[appliances.BeverageFridgeFactory]
+            .related_to(r)
+            .count()
+            .in_range(0, 1)
+        )
+    if kitchen_oven_enabled:
+        # 0-1, not exactly 1. The oven and the counter run are added in the
+        # same on-floor-and-wall stage in random order, so forcing an oven
+        # meant that whenever it was proposed first it took the only wall long
+        # enough for the run and the kitchen finished with no counter at all
+        # (seed 3). Optional, the counter always wins the wall and the oven
+        # takes what is left.
+        appliance_terms.append(
+            lambda r: kitchen_appliances_big[appliances.OvenFactory]
+            .related_to(r)
+            .count()
+            .in_range(0, 1)
+        )
+    if kitchen_microwave_enabled:
+        appliance_terms.append(
+            lambda r: microwaves.related_to(wallcounter.related_to(r))
+            .count()
+            .in_range(0, 1)
+        )
+
+    if appliance_terms:
+
+        def _appliance_all(r):
+            expr = appliance_terms[0](r)
+            for term in appliance_terms[1:]:
+                expr = expr * term(r)
+            return expr
+
+        constraints["kitchen_appliance"] = kitchens.all(_appliance_all)
 
     score_terms["kitchen_appliance"] = kitchens.mean(
         lambda r: (
-            kitchen_appliances.mean(
+            # Wanting an oven, rather than requiring one. Every other term here
+            # is a cost, so an optional appliance was never worth adding and no
+            # kitchen got one; a hard `== 1` does place it but starves the
+            # counter of wall in a small kitchen. A reward lets the counter
+            # take its wall first and the oven fill in around it.
+            (
+                kitchen_appliances_big[appliances.OvenFactory]
+                .related_to(r)
+                .count()
+                .maximize(weight=15)
+                if kitchen_oven_enabled
+                else 0
+            )
+            + kitchen_appliances.mean(
                 lambda t: (
                     t.distance(wallcounter.related_to(r)).minimize(weight=1)
                     + cl.accessibility_cost(t, r, dist=1).minimize(weight=10)
@@ -1807,7 +1918,8 @@ def home_furniture_constraints(
     toilet = wallfurn[bathroom.ToiletFactory]
     bathtub = wallfurn[bathroom.BathtubFactory]
     sink = wallfurn[bathroom.StandingSinkFactory]
-    shower = wallfurn[bathroom.ShowerStallFactory]
+    # Flush to the wall: against_wall's 7 cm margin left a gap behind the mixer.
+    shower = furniture[bathroom.ShowerStallFactory].related_to(rooms, cu.flush_fixture)
     vanity = wallfurn[bathroom.VanityCabinetFactory]
     exhaust = obj[bathroom.ExhaustFanFactory].related_to(rooms, cu.hanging)
     floor_drains = obj[bathroom.FloorDrainFactory].related_to(rooms, cu.on_floor)
@@ -1841,7 +1953,15 @@ def home_furniture_constraints(
     constraints["bathtub"] = bathrooms.all(
         lambda r: (
             bathtub.related_to(r).count().in_range(0, 1)
-            * hardware.related_to(r).count().in_range(1, 4)
+            * hardware.related_to(r).count().in_range(1, 3)
+            # Rails and hooks hang at towel height. Only a soft score covered
+            # this before, and they were ending up at 2.9 m against the ceiling.
+            * hardware.related_to(r).all(
+                lambda t: (
+                    (t.distance(r, cu.floortags).in_range(0.55, 1.55))
+                    * (t.distance(cutters) > 0.15)
+                )
+            )
         )
     )
     score_terms["bathtub"] = bathrooms.all(
@@ -1852,6 +1972,18 @@ def home_furniture_constraints(
                 lambda t: (
                     t.distance(rooms, cu.floortags).hinge(0.5, 1).minimize(weight=15)
                 )
+            )
+        )
+    )
+
+    # A wall mixer belongs over the bath or the basin. Without this the solver
+    # was free to hang it on any blank wall, which is what made it read as a
+    # stray piece of pipework.
+    score_terms["faucets"] = rooms[Semantics.Bathroom].mean(
+        lambda r: faucets.related_to(r).mean(
+            lambda t: (
+                t.distance(bathtub.related_to(r)).hinge(0.0, 0.35).minimize(weight=20)
+                + t.distance(sink.related_to(r)).hinge(0.0, 0.9).minimize(weight=4)
             )
         )
     )
@@ -1878,7 +2010,7 @@ def home_furniture_constraints(
             shower.related_to(r).count().maximize(weight=3)
             + shower.related_to(r).mean(
                 lambda t: (
-                    t.distance(r, cu.walltags).minimize(weight=4)
+                    t.distance(r, cu.walltags).minimize(weight=12)
                     + t.distance(doors).maximize(weight=2)
                     + cl.accessibility_cost(t, furniture, dist=0.6).minimize(weight=3)
                 )
@@ -1888,7 +2020,9 @@ def home_furniture_constraints(
 
     constraints["vanities"] = bathrooms.all(
         lambda r: (
-            vanity.related_to(r).count().in_range(0, 1)
+            vanity.related_to(r)
+            .count()
+            .in_range(0, 1 if bathroom_vanity_enabled else 0)
             * vanity.related_to(r).all(
                 lambda t: (
                     (t.distance(toilet) > 0.30)
@@ -1907,6 +2041,10 @@ def home_furniture_constraints(
         )
     )
 
+    constraints["bathroom_ceiling_lights"] = bathrooms.all(
+        lambda r: ceillights.related_to(r, cu.hanging).count().in_range(1, 2)
+    )
+
     constraints["exhaust_fans"] = bathrooms.all(
         lambda r: (
             exhaust.related_to(r).count().equals(1)
@@ -1922,7 +2060,7 @@ def home_furniture_constraints(
         lambda r: exhaust.related_to(r).mean(
             lambda t: (
                 t.distance(r, cu.ceilingtags).minimize(weight=8)
-                + t.distance(r, cu.walltags).hinge(0.15, 0.50).minimize(weight=3)
+                + t.distance(r, cu.walltags).hinge(0.50, 1.20).minimize(weight=3)
             )
         )
     )
@@ -1965,7 +2103,9 @@ def home_furniture_constraints(
 
     constraints["toilet_paper"] = bathrooms.all(
         lambda r: (
-            tp_holder.related_to(r).count().equals(1)
+            tp_holder.related_to(r)
+            .count()
+            .in_range(0, 1 if bathroom_toilet_paper_enabled else 0)
             * tp_holder.related_to(r).all(
                 lambda t: (
                     (t.distance(r, cu.floortags).in_range(0.62, 0.75))
@@ -1974,9 +2114,12 @@ def home_furniture_constraints(
             )
         )
     )
+    # Kept as a strong preference rather than a hard reach limit: made hard, the
+    # holder became unplaceable in a small bathroom and the solver dropped it
+    # from the room altogether, which is worse than one sited a little wide.
     score_terms["toilet_paper"] = bathrooms.mean(
         lambda r: tp_holder.related_to(r).mean(
-            lambda t: t.distance(toilet.related_to(r)).hinge(0.15, 0.45).minimize(weight=8)
+            lambda t: t.distance(toilet.related_to(r)).hinge(0.15, 0.45).minimize(weight=40)
         )
     )
     # endregion

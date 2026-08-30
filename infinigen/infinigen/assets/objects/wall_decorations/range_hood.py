@@ -11,12 +11,12 @@ import infinigen.core.util.blender as butil
 from infinigen.assets.composition import material_assignments
 from infinigen.assets.objects.table_decorations.utils import nodegroup_lofting_poly
 from infinigen.assets.objects.tables.table_utils import nodegroup_n_gon_profile
+from infinigen.assets.objects.wall_decorations.primitives import appliance_steel
 from infinigen.core import surface
 from infinigen.core.nodes import node_utils
 from infinigen.core.nodes.node_wrangler import Nodes, NodeWrangler
 from infinigen.core.placement.factory import AssetFactory
 from infinigen.core.util.math import FixedSeed
-from infinigen.core.util.random import weighted_sample
 
 
 class RangeHoodFactory(AssetFactory):
@@ -30,9 +30,13 @@ class RangeHoodFactory(AssetFactory):
             self.initialize_materials()
 
     def initialize_materials(self):
-        surface_gen_class = weighted_sample(material_assignments.metals)
-        self.surface_material_gen = surface_gen_class()
-        self.surface = self.surface_material_gen
+        # Brushed stainless, fixed. The general metals list handed the hood
+        # galvanized or hammered finishes, and even the brushed one draws its
+        # base colour from colors.metal_hsv(), which runs warm - the hood
+        # rendered as a lumpy olive-green box over the hob. Appliance faces are
+        # neutral steel, and one shared material keeps every hood in a blend
+        # agreeing with the other fittings.
+        self.surface = appliance_steel
 
         scratch_prob, edge_wear_prob = material_assignments.wear_tear_prob
         scratch, edge_wear = material_assignments.wear_tear

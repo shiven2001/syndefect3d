@@ -170,6 +170,11 @@ def shader_plaster(nw: NodeWrangler, plaster_colored=None, **kwargs):
         input_kwargs={
             "Scale": log_uniform(0.0022, 0.0050),
             "Height": disp_height,
+            # Midlevel defaults to 0.5, so a height of ~0 displaces the whole
+            # surface by -0.5*Scale along its normal. Fine as a bump map, but
+            # real geometry under displacement_mode="BOTH" - it crumpled small
+            # metal parts (taps, handles) into blobs.
+            "Midlevel": 0.0,
         },
     )
 

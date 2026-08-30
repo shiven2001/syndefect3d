@@ -29,7 +29,10 @@ def shader_rug(nw: NodeWrangler, strength=0.01, **kwargs):
         )
 
     displacement = nw.new_node(
-        Nodes.Displacement, input_kwargs={"Scale": strength, "Height": height}
+        Nodes.Displacement,
+        # Midlevel defaults to 0.5, which displaces the surface by -0.5*Scale
+        # along its normal regardless of Height.
+        input_kwargs={"Scale": strength, "Height": height, "Midlevel": 0.0},
     )
 
     base_hue = uniform(0, 1)
