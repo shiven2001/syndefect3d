@@ -210,6 +210,19 @@ Add subtle dirt, stains, or wear shaders to plain walls so they are not perfectl
 **Where:** Infinigen material factories / `compose_indoors` material assignment  
 **Reference constraint already in minimal configs:** `weak_leak_stain` in `restrict_solving.consgraph_filters`
 
+**Implemented** in `infinigen/infinigen/core/rendering/surface_detail.py`, run from
+`apply_realism_adjustments` at render time (so existing blends pick it up on re-render):
+
+- `apply_surface_imperfections` — a `SynDefectSurfaceImperfection` shader group (broad noise
+  smudges over fine Musgrave dust/grease grain, object coords, 4D so the seed varies per
+  material) inserted into the Roughness of every Principled BSDF. Skips defect shaders (the
+  label) and transmissive materials (would frost the windows).
+- `add_edge_bevels` — 2 mm / 3-segment Bevel modifier, limit method Angle, on every mesh under
+  a poly budget. Perfectly sharp arrises are the geometric counterpart to flat roughness.
+  Skips defect planes so annotation geometry never moves.
+
+Enabled in `realism_v2.gin`; both default to no-op in code.
+
 ---
 
 ## Priority 3 — Camera & sensor simulation

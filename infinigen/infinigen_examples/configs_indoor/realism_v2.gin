@@ -133,3 +133,24 @@ compositor_postprocessing.dispersion = 0.004
 compositor_postprocessing.sharpen = 0.28
 compositor_postprocessing.sharpen_type = "SHARPEN_DIAMOND"
 compositor_postprocessing.grain = 0.02
+
+# --- Micro-detail: edge bevels + surface imperfection (render-time) ---
+# Perfectly sharp edges and one flat roughness per surface are the two
+# geometric/shading CGI tells left after the tonal work above. Both passes run
+# from apply_realism_adjustments, so existing blends pick them up on re-render.
+# 2 mm at 3 segments is a painted-arris highlight, not a visible chamfer.
+add_edge_bevels.enabled = True
+add_edge_bevels.width = 0.002
+add_edge_bevels.segments = 3
+add_edge_bevels.angle_deg = 30.0
+# Dense assets: a 2 mm chamfer is sub-pixel but the geometry is not free.
+add_edge_bevels.max_polygons = 100000
+# Defect planes are the label - never move their geometry.
+add_edge_bevels.skip_defects = True
+
+apply_surface_imperfections.enabled = True
+apply_surface_imperfections.strength = 0.06
+apply_surface_imperfections.scale = 6.0
+# Skips defect shaders (the signal) and glass (would frost the windows).
+apply_surface_imperfections.skip_defects = True
+apply_surface_imperfections.skip_transmissive = True

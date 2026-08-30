@@ -18,6 +18,10 @@ from infinigen.assets.wall_bubble_plane import refresh_wall_bubble_materials
 from infinigen.core.nodes.node_info import Nodes
 from infinigen.core.nodes.node_utils import resample_node_group
 from infinigen.core.nodes.node_wrangler import NodeWrangler
+from infinigen.core.rendering.surface_detail import (
+    add_edge_bevels,
+    apply_surface_imperfections,
+)
 from infinigen.core.util.logging import Timer
 from infinigen.core.util.math import FixedSeed, int_hash
 
@@ -456,6 +460,8 @@ def apply_realism_adjustments(
     flatten_bathroom_fixture_materials()
     hide_cable_trunks()
     soften_existing_lights()
+    add_edge_bevels()
+    apply_surface_imperfections()
     configure_photo_cycles()
     restore_ceiling_fixture_visibility()
     sky_lighting.add_camera_based_lighting()
