@@ -122,6 +122,10 @@ def compositor_postprocessing(
     show=True,
     color_correct=True,
     distort=0,
+    dispersion=0,
+    exposure=0.0,
+    sharpen=0.0,
+    sharpen_type="SHARPEN_DIAMOND",
     glare=False,
     glare_type="FOG_GLOW",
     glare_threshold=0.85,
@@ -135,10 +139,14 @@ def compositor_postprocessing(
 
     Defaults match the original Infinigen look (high contrast). Override via gin
     for phone-like realism (see ``realism_v2.gin``).
+
+    RGB only — material-index GT is written from Render Layers, so keep barrel /
+    CA slight if YOLO boxes must stay aligned with the RGB.
     """
-    if distort and distort > 0:
+    if abs(float(exposure or 0.0)) > 1e-6:
         source = nw.new_node(
-            Nodes.LensDistortion, input_kwargs={"Image": source, "Dispersion": distort}
+            Nodes.Exposure,
+            input_kwargs={"Image": source, "Exposure": float(exposure)},
         )
 
     if color_correct:
@@ -153,17 +161,6 @@ def compositor_postprocessing(
             input_kwargs={"Image": source, "Saturation": float(saturation)},
         )
 
-    if grain and grain > 0:
-        tex = bpy.data.textures.get("SynDefectFilmGrain")
-        if tex is None:
-            tex = bpy.data.textures.new("SynDefectFilmGrain", type="NOISE")
-        noise_node = nw.new_node(Nodes.CompositorTexture, attrs={"texture": tex})
-        source = nw.new_node(
-            Nodes.CompositorMixRGB,
-            input_kwargs={"Fac": float(grain), 1: source, 2: noise_node},
-            attrs={"blend_type": "ADD"},
-        )
-
     if glare:
         source = nw.new_node(
             Nodes.Glare,
@@ -173,6 +170,36 @@ def compositor_postprocessing(
                 "threshold": float(glare_threshold),
                 "mix": float(glare_mix),
             },
+        )
+
+    distort_amt = float(distort) if distort else 0.0
+    dispersion_amt = float(dispersion) if dispersion else 0.0
+    if abs(distort_amt) > 1e-6 or abs(dispersion_amt) > 1e-6:
+        source = nw.new_node(
+            Nodes.LensDistortion,
+            input_kwargs={
+                "Image": source,
+                "Distortion": distort_amt,
+                "Dispersion": dispersion_amt,
+            },
+        )
+
+    if sharpen and float(sharpen) > 1e-6:
+        source = nw.new_node(
+            Nodes.CompositorFilter,
+            input_kwargs={"Image": source, "Fac": float(sharpen)},
+            attrs={"filter_type": sharpen_type},
+        )
+
+    if grain and grain > 0:
+        tex = bpy.data.textures.get("SynDefectFilmGrain")
+        if tex is None:
+            tex = bpy.data.textures.new("SynDefectFilmGrain", type="NOISE")
+        noise_node = nw.new_node(Nodes.CompositorTexture, attrs={"texture": tex})
+        source = nw.new_node(
+            Nodes.CompositorMixRGB,
+            input_kwargs={"Fac": float(grain), 1: source, 2: noise_node},
+            attrs={"blend_type": "ADD"},
         )
 
     if show:
@@ -446,7 +473,9 @@ def configure_compositor(
     passes_to_save: list,
     flat_shading: bool,
 ):
+    bpy.context.scene.use_nodes = True
     compositor_node_tree = bpy.context.scene.node_tree
+    compositor_node_tree.nodes.clear()
     nw = NodeWrangler(compositor_node_tree)
 
     render_layers = nw.new_node(Nodes.RenderLayers)
@@ -577,6 +606,9 @@ def render_image(
     for file_slot in file_slot_nodes:
         file_slot.path = f"{file_slot.path}{fileslot_suffix}"
 
+    cam_util.adjust_camera_sensor(camera)
+    cam_util.configure_smartphone_optics(camera, apply_focus_distance=False)
+
     if use_dof == "IF_TARGET_SET":
         use_dof = camera.data.dof.focus_object is not None
     elif use_dof is not None:
@@ -586,6 +618,7 @@ def render_image(
     if render_resolution_override is not None:
         bpy.context.scene.render.resolution_x = render_resolution_override[0]
         bpy.context.scene.render.resolution_y = render_resolution_override[1]
+        cam_util.adjust_camera_sensor(camera)
 
     # Render the scene
     bpy.context.scene.camera = camera
@@ -601,8 +634,8 @@ def render_image(
                 suffix = get_suffix(dict(frame=frame, **indices))
                 postprocess_blendergt_outputs(frames_folder, suffix, camera)
             else:
-                # Adjust camera sensor to match current render resolution (e.g. 1024x1024)
-                # when scene was created with different aspect (e.g. 1280x720)
+                # Adjust camera sensor to match current render resolution
+                # when scene was created with a different aspect.
                 cam_util.adjust_camera_sensor(camera)
                 cam_util.save_camera_parameters(
                     camera,

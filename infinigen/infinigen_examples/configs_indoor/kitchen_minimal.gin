@@ -61,7 +61,7 @@ populate_doors.door_chance = 1.0
 # compose_indoors.solve_steps_small = 5
 
 
-# Match camera sensor to 1024x1024 renders
-execute_tasks.generate_resolution = (1024, 1024)
-get_sensor_coords.H = 1024
-get_sensor_coords.W = 1024
+# 4:3 smartphone still (must match realism_v2.gin / get_sensor_coords)
+execute_tasks.generate_resolution = (1920, 1440)
+get_sensor_coords.H = 1440
+get_sensor_coords.W = 1920

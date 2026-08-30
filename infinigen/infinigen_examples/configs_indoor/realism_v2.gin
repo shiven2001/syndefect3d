@@ -19,12 +19,10 @@
 # See REALISM_IMPROVEMENTS.md for validation and pilot re-render workflow.
 
 # --- Lighting ---
-# 2.20 rendered a bedroom at mean brightness 189 against a 160-176 measured on
-# the real Roboflow set; 1.45 lands at ~170. Saturation is deliberately left
-# near 1.0: the real set's mean saturation of 16-20 comes from close-up crops
-# of painted wall, and pulling a wide room down to that number turns the
-# parquet grey without making anything more photographic.
-configure_render_cycles.exposure = 1.45
+# Compositor Exposure +1 EV over film 1.0 is the inspection-photo overexpose
+# (windows blow, AgX rolls highlights). Saturation stays near 1.0: the real
+# set's mean saturation of 16-20 comes from close-up crops of painted wall.
+configure_render_cycles.exposure = 1.0
 nishita_lighting.strength = 0.24
 nishita_lighting.sun_elevation = ("clip_gaussian", 22, 10, 8, 40)
 # The sun subtends ~0.53 deg. Nishita treats sunlight as a parallel beam for
@@ -49,8 +47,15 @@ populate_doors.door_chance = 1.0
 populate_doors.n_doors = 1
 populate_windows.n_windows = 1
 
-# Wide indoor cameras closer to a phone (~24 mm) instead of 15 mm fisheye.
-camera.camera_pose_proposal.focal_length = 24
+# iPhone 11 wide: 5.6 mm sensor, 3.7 mm lens (~74 deg HFOV). Not 35 mm-equivalent.
+# New coarse recommended so pose search uses this FOV; render also applies it.
+camera.adjust_camera_sensor.sensor_width = 5.6
+camera.configure_smartphone_optics.enabled = True
+camera.configure_smartphone_optics.focal_length = 3.7
+camera.configure_smartphone_optics.use_dof = True
+camera.configure_smartphone_optics.aperture_fstop = 1.8
+camera.configure_smartphone_optics.focus_distance = 2.0
+camera.camera_pose_proposal.focal_length = 3.7
 
 # On-camera flash flattens wide rooms. Leave off; defect close-ups can override.
 add_camera_based_lighting.enabled = False
@@ -69,15 +74,28 @@ restore_ceiling_fixture_visibility.enabled = True
 # --- Defect cameras (must be set at coarse time for new rigs) ---
 camera.add_defect_focus.enabled = True
 camera.pose_defect_cameras.distance = 0.9
-camera.pose_defect_cameras.focal_length = 28
+camera.pose_defect_cameras.focal_length = 3.7
 camera.pose_defect_cameras.height_jitter = 0.08
 camera.pose_defect_cameras.horizontal_jitter = 0.12
 camera.pose_defect_cameras.angle_noise_deg = 6
 
 # --- Render / materials ---
+# 4:3 smartphone still (iPhone / Android). Crop/scale to 640 or 1024 at export.
+execute_tasks.generate_resolution = (1920, 1440)
+get_sensor_coords.H = 1440
+get_sensor_coords.W = 1920
+
 set_displacement_mode.displacement_mode = "BOTH"
 configure_render_cycles.num_samples = 1024
 configure_render_cycles.denoise = True
+
+# Deep focus (tiny sensor + f/1.8). Motion blur shutter 0.1 = crisp daylight phone.
+render_image.use_dof = True
+render_image.dof_aperture_fstop = 1.8
+defect/render_image.use_dof = True
+defect/render_image.dof_aperture_fstop = 1.8
+configure_blender.motion_blur = True
+configure_blender.motion_blur_shutter = 0.1
 
 # Extra dry-room wall/ceiling pull toward grey (tiles in kitchen/bathroom are skipped)
 desaturate_surface_materials.saturation_scale = 0.70
@@ -88,19 +106,18 @@ plaster_paint_params.colored_prob = 0.0
 plaster_paint_params.max_saturation = 0.04
 
 # --- Compositor: phone-like, not clean CG ---
+# Chain: Exposure -> grade -> Fog Glow -> barrel+CA -> Diamond Sharpen -> grain
+compositor_postprocessing.exposure = 1.0
 compositor_postprocessing.color_correct = True
 compositor_postprocessing.contrast = 1.06
 compositor_postprocessing.bright = 1.0
 compositor_postprocessing.saturation = 0.92
-compositor_postprocessing.distort = 0.018
-compositor_postprocessing.grain = 0.045
 compositor_postprocessing.glare = True
 compositor_postprocessing.glare_type = "FOG_GLOW"
-compositor_postprocessing.glare_threshold = 0.88
-compositor_postprocessing.glare_mix = -0.84
-
-# Optional phone-like DoF (uncomment to enable)
-# render_image.use_dof = True
-# render_image.dof_aperture_fstop = 2.8
-# defect/render_image.use_dof = True
-# defect/render_image.dof_aperture_fstop = 2.8
+compositor_postprocessing.glare_threshold = 0.40
+compositor_postprocessing.glare_mix = -0.55
+compositor_postprocessing.distort = 0.02
+compositor_postprocessing.dispersion = 0.012
+compositor_postprocessing.sharpen = 0.65
+compositor_postprocessing.sharpen_type = "SHARPEN_DIAMOND"
+compositor_postprocessing.grain = 0.045

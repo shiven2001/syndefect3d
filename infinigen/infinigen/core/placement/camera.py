@@ -43,10 +43,14 @@ logger = logging.getLogger(__name__)
 
 
 @gin.configurable
-def get_sensor_coords(cam, H, W, sparse=False):
+def get_sensor_coords(cam, H=None, W=None, sparse=False):
     camd = cam.data
     f_in_m = camd.lens / 1000
     scene = bpy.context.scene
+    if W is None:
+        W = int(scene.render.resolution_x)
+    if H is None:
+        H = int(scene.render.resolution_y)
     resolution_x_in_px = W
     resolution_y_in_px = H
 
@@ -100,14 +104,49 @@ def get_sensor_coords(cam, H, W, sparse=False):
     return cam_coords_vectors, pixel_locs
 
 
-def adjust_camera_sensor(cam):
+@gin.configurable
+def adjust_camera_sensor(cam, sensor_width=None, sensor_height=18.0):
+    """Match camera sensor aspect to the current render resolution.
+
+    Default is original Infinigen (18 mm height, width scaled to aspect).
+    Phone-like configs pass ``sensor_width`` (e.g. 5.6 mm iPhone 11) and height
+    is derived so the K-matrix aspect check stays valid.
+    """
     scene = bpy.context.scene
     W = scene.render.resolution_x
     H = scene.render.resolution_y
-    sensor_width = 18 * (W / H)
-    assert sensor_width.is_integer(), (18, W, H)
-    cam.data.sensor_height = 18
-    cam.data.sensor_width = int(sensor_width)
+    if sensor_width is not None:
+        cam.data.sensor_fit = "HORIZONTAL"
+        cam.data.sensor_width = float(sensor_width)
+        cam.data.sensor_height = float(sensor_width) * H / W
+        return
+    cam.data.sensor_fit = "AUTO"
+    cam.data.sensor_height = float(sensor_height)
+    cam.data.sensor_width = float(sensor_height) * (W / H)
+
+
+@gin.configurable
+def configure_smartphone_optics(
+    cam,
+    enabled=False,
+    focal_length=3.7,
+    use_dof=True,
+    aperture_fstop=1.8,
+    focus_distance=2.0,
+    clip_start=0.02,
+    apply_focal_length=True,
+    apply_focus_distance=True,
+):
+    """iPhone-like lens / deep DoF. No-op unless ``enabled`` (see realism_v2.gin)."""
+    if not enabled or cam is None or cam.type != "CAMERA":
+        return
+    if apply_focal_length:
+        cam.data.lens = float(focal_length)
+    cam.data.clip_start = float(clip_start)
+    cam.data.dof.use_dof = bool(use_dof)
+    cam.data.dof.aperture_fstop = float(aperture_fstop)
+    if apply_focus_distance:
+        cam.data.dof.focus_distance = float(focus_distance)
 
 
 def spawn_camera():
@@ -115,6 +154,7 @@ def spawn_camera():
     cam = bpy.context.active_object
     cam.data.clip_end = 1e4
     adjust_camera_sensor(cam)
+    configure_smartphone_optics(cam)
     return cam
 
 
@@ -638,7 +678,10 @@ def pose_defect_cameras(
         cam_rig.rotation_euler = rot_euler
 
         for cam in cam_rig.children:
+            if cam.type != "CAMERA":
+                continue
             cam.data.lens = focal_length
+            cam.data.dof.focus_distance = dist_to_target
 
         logger.info(
             f"Defect camera {cam_rig.name} -> {target.name} "
@@ -962,7 +1005,7 @@ def animate_cameras(
 
 @gin.configurable
 def save_camera_parameters(
-    camera_obj: bpy.types.Object, output_folder: Path, frame: int, use_dof=False
+    camera_obj: bpy.types.Object, output_folder: Path, frame: int, use_dof=None
 ):
     output_folder = Path(output_folder)
     output_folder.mkdir(exist_ok=True, parents=True)

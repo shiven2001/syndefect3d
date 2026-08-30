@@ -15,9 +15,9 @@ defect/render_image.passes_to_save = [
     ['material_index', 'IndexMA'],
 ]
 
-# Override resolution for defect renders
-execute_tasks.generate_resolution = (1024, 1024)
-get_sensor_coords.H = 1024
-get_sensor_coords.W = 1024
+# 4:3 smartphone still (must match realism_v2.gin)
+execute_tasks.generate_resolution = (1920, 1440)
+get_sensor_coords.H = 1440
+get_sensor_coords.W = 1920
 
 

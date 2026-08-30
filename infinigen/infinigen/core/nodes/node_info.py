@@ -257,6 +257,7 @@ class Nodes:
     Glare = "CompositorNodeGlare"
     HueSaturation = "CompositorNodeHueSat"
     CompositorTexture = "CompositorNodeTexture"
+    CompositorFilter = "CompositorNodeFilter"
 
     # World Nodes
     SkyTexture = "ShaderNodeTexSky"
@@ -349,6 +350,8 @@ NODE_ATTRS_AVAILABLE = {
     Nodes.SeparateRGB: ["mode"],
     Nodes.SeparateColor: ["mode"],
     Nodes.DomainSize: ["component"],
+    Nodes.CompositorFilter: ["filter_type"],
+    Nodes.Glare: ["glare_type", "quality", "mix", "threshold"],
 }
 
 # Certain nodes should only be created once. This list defines which ones.
