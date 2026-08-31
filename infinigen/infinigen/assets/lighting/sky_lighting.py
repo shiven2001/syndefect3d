@@ -100,16 +100,15 @@ def add_lighting(cam=None, mode="nishita"):
     """Install the world shader. ``mode`` is ``nishita`` (procedural sky) or ``hdri``.
 
     HDRI uses ``hdri_lighting`` and files in ``resources/hdri``. If that folder is
-    empty, falls back to Nishita. An HDRI already stored in the .blend is kept
-    (so render does not pick a different map than coarse).
+    empty, falls back to Nishita. An HDRI already packed in the .blend is reused
+    as the image, but Mapping scale / strength are always rebuilt so gin
+    overrides apply at render.
     """
     from infinigen.assets.lighting import hdri_lighting as hdri_mod
 
     use_hdri = mode == "hdri"
-    if use_hdri and hdri_mod.existing_world_hdri_image() is not None:
-        logger.info("Keeping HDRI already in the world shader")
-        return
-    if use_hdri and not hdri_mod.list_hdri_files():
+    cached_image = hdri_mod.existing_world_hdri_image() if use_hdri else None
+    if use_hdri and cached_image is None and not hdri_mod.list_hdri_files():
         logger.warning(
             "add_lighting mode=hdri but resources/hdri has no .exr/.hdr; "
             "falling back to Nishita. Run python tools/download_polyhaven_hdris.py"
@@ -119,7 +118,7 @@ def add_lighting(cam=None, mode="nishita"):
     _reset_world_tree()
     nw = NodeWrangler(bpy.context.scene.world.node_tree)
     if use_hdri:
-        surface = hdri_mod.hdri_lighting(nw)
+        surface = hdri_mod.hdri_lighting(nw, existing_image=cached_image)
     else:
         surface = nishita_lighting(nw, cam)
 

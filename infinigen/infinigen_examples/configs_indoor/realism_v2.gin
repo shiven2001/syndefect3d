@@ -42,8 +42,12 @@ add_multi_directional_sun_lighting.n_directions = 0
 add_multi_directional_sun_lighting.elevation_deg = 28.0
 add_multi_directional_sun_lighting.energy_per_sun = 1.6
 add_multi_directional_sun_lighting.sun_angle_deg = 0.53
-# Procedural Nishita sky through windows (not Poly Haven HDRI).
-sky_lighting.add_lighting.mode = "nishita"
+# Outdoor Poly Haven HDRI through windows. Mapping Scale > 1 shrinks landscape
+# features (equirect has no metric size). Strength 6-9 is window fill.
+# Download once: python tools/download_polyhaven_hdris.py
+sky_lighting.add_lighting.mode = "hdri"
+hdri_lighting.strength = ("uniform", 6.0, 9.0)
+hdri_lighting.scale = 3.0
 compose_indoors.lights_off_chance = 0.0
 compose_indoors.terrain_enabled = False
 populate_doors.all_closed = True
