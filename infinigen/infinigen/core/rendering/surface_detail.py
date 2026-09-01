@@ -266,3 +266,40 @@ def apply_surface_imperfections(
         n_mats += int(touched)
 
     logger.info("surface imperfection: patched roughness on %s materials", n_mats)
+
+
+def disable_crack_plane_lighting():
+    """Stop crack decals shading the wall/ceiling/floor behind them.
+
+    Cycles still traces shadow and GI rays through unused film even when
+    the shader is Transparent. A hairline crack should not cast a card-shaped
+    contact shadow; only the camera should see the fissure.
+    """
+    n_obj = n_mat = 0
+    for obj in bpy.data.objects:
+        if obj.type != "MESH" or obj.data is None:
+            continue
+        mats = [m for m in obj.data.materials if m is not None]
+        if not any((m.name or "").startswith("CrackMaterial") for m in mats):
+            continue
+        obj.visible_shadow = False
+        obj.visible_diffuse = False
+        if hasattr(obj, "visible_glossy"):
+            obj.visible_glossy = False
+        if hasattr(obj, "visible_transmission"):
+            obj.visible_transmission = False
+        if hasattr(obj, "visible_volume_scatter"):
+            obj.visible_volume_scatter = False
+        n_obj += 1
+        for mat in mats:
+            if not (mat.name or "").startswith("CrackMaterial"):
+                continue
+            if hasattr(mat, "use_transparent_shadow"):
+                mat.use_transparent_shadow = False
+            if hasattr(mat, "shadow_method"):
+                mat.shadow_method = "NONE"
+            n_mat += 1
+    if n_obj:
+        logger.info(
+            "Disabled lighting rays on %s crack planes (%s materials)", n_obj, n_mat
+        )

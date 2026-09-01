@@ -21,6 +21,7 @@ from infinigen.core.nodes.node_wrangler import NodeWrangler
 from infinigen.core.rendering.surface_detail import (
     add_edge_bevels,
     apply_surface_imperfections,
+    disable_crack_plane_lighting,
 )
 from infinigen.core.util.logging import Timer
 from infinigen.core.util.math import FixedSeed, int_hash
@@ -462,6 +463,7 @@ def apply_realism_adjustments(
     soften_existing_lights()
     add_edge_bevels()
     apply_surface_imperfections()
+    disable_crack_plane_lighting()
     configure_photo_cycles()
     restore_ceiling_fixture_visibility()
     sky_lighting.add_camera_based_lighting()

@@ -1515,6 +1515,9 @@ CEILING_DEFECT_FACTORIES = {
     "CeilingCrackPlaneFactory",
     "CeilingPeelFactory",
 }
+FLOOR_DEFECT_FACTORIES = {
+    "FloorCrackPlaneFactory",
+}
 
 
 def _room_stem(name):
@@ -1553,13 +1556,14 @@ def _is_tiled_surface(obj):
     return False
 
 
-def strip_defects_on_tiled_surfaces(walls, ceilings, state):
+def strip_defects_on_tiled_surfaces(walls, ceilings, state, floors=None):
     """Drop paint/crack defects sitting on tiled bathroom/kitchen finishes."""
     tiled_walls = {_room_stem(w.name) for w in (walls or []) if _is_tiled_surface(w)}
     tiled_ceils = {
         _room_stem(c.name) for c in (ceilings or []) if _is_tiled_surface(c)
     }
-    if not tiled_walls and not tiled_ceils:
+    tiled_floors = {_room_stem(f.name) for f in (floors or []) if _is_tiled_surface(f)}
+    if not tiled_walls and not tiled_ceils and not tiled_floors:
         return 0
 
     to_delete = []
@@ -1574,6 +1578,8 @@ def strip_defects_on_tiled_surfaces(walls, ceilings, state):
             drop = any(h in tiled_walls for h in hosts)
         elif gname in CEILING_DEFECT_FACTORIES:
             drop = any(h in tiled_ceils for h in hosts)
+        elif gname in FLOOR_DEFECT_FACTORIES:
+            drop = any(h in tiled_floors for h in hosts)
         if drop and os.obj is not None:
             to_delete.append(os.obj)
             os.obj = None
@@ -1582,10 +1588,11 @@ def strip_defects_on_tiled_surfaces(walls, ceilings, state):
         return 0
 
     logger.info(
-        "Removing %s defects from tiled surfaces (rooms walls=%s ceilings=%s)",
+        "Removing %s defects from tiled surfaces (rooms walls=%s ceilings=%s floors=%s)",
         len(to_delete),
         sorted(tiled_walls),
         sorted(tiled_ceils),
+        sorted(tiled_floors),
     )
     deleted = set(to_delete)
     try:

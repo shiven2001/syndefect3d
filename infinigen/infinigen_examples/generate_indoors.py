@@ -22,6 +22,7 @@ from infinigen import repo_root
 from infinigen.assets import lighting
 # Boolean/cutter logic (commented out - not needed):
 # from infinigen.assets.spalling_plane import apply_spalling_plug_boolean_to_walls
+from infinigen.assets.crack_plane import tint_floor_cracks_from_host
 from infinigen.assets.materials.dev import InvisibleToCamera
 from infinigen.assets.objects.wall_decorations.skirting_board import make_skirting_board
 from infinigen.assets.placement.floating_objects import FloatingObjectPlacement
@@ -112,9 +113,16 @@ def default_greedy_stages():
     greedy_stages["on_floor_and_wall"] = primary.with_relation(
         on_floor, all_room
     ).with_relation(on_wall, all_room)
-    greedy_stages["on_floor_freestanding"] = primary.with_relation(
-        on_floor, all_room
-    ).with_relation(-on_wall, all_room)
+    # Floor furniture vs floor defects must be separate stages: greedy
+    # coverage requires a unique stage per bound, and floor defects have to
+    # run in solve_medium (the *_minimal configs skip solve_large).
+    on_floor_free = primary.with_relation(on_floor, all_room).with_relation(
+        -on_wall, all_room
+    )
+    greedy_stages["on_floor_freestanding"] = on_floor_free.with_tags(
+        {-t.Semantics.Defects}
+    )
+    greedy_stages["on_floor_defect"] = on_floor_free.with_tags({t.Semantics.Defects})
     greedy_stages["on_wall"] = (
         primary.with_relation(-on_floor, all_room)
         .with_relation(-on_ceiling, all_room)
@@ -275,6 +283,7 @@ def compose_indoors(
     def solve_medium():
         solve_stage_name("on_wall", "medium")
         solve_stage_name("on_ceiling", "medium")
+        solve_stage_name("on_floor_defect", "medium")
         solve_stage_name("side_obj", "medium")
 
     p.run_stage("solve_medium", solve_medium, use_chance=False, default=state)
@@ -540,6 +549,20 @@ def compose_indoors(
             rooms_split["floor"].objects,
             material_seed=overrides.get("material_seed", scene_seed + 2000),
         ),
+        use_chance=False,
+    )
+    p.run_stage(
+        "strip_tiled_floor_defects",
+        lambda: room_dec.strip_defects_on_tiled_surfaces(
+            [], [], state, floors=rooms_split["floor"].objects
+        ),
+        prereq="room_floors",
+        use_chance=False,
+    )
+    p.run_stage(
+        "tint_floor_cracks",
+        lambda: tint_floor_cracks_from_host(state, rooms_split["floor"].objects),
+        prereq="strip_tiled_floor_defects",
         use_chance=False,
     )
     p.run_stage(

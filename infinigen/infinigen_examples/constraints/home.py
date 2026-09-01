@@ -25,7 +25,11 @@ from infinigen.assets.objects import (
 )
 
 from infinigen.assets import static_assets
-from infinigen.assets.crack_plane import CeilingCrackPlaneFactory, CrackPlaneFactory
+from infinigen.assets.crack_plane import (
+    CeilingCrackPlaneFactory,
+    CrackPlaneFactory,
+    FloorCrackPlaneFactory,
+)
 from infinigen.assets.paint_peel_plane import (
     CeilingPeelFactory,
     PaintPeelPlaneFactory,
@@ -503,6 +507,8 @@ def home_furniture_constraints(
     crack_count_max: int = 10,
     crack_ceiling_count_min: int = 1,
     crack_ceiling_count_max: int = 4,
+    crack_floor_count_min: int = 1,
+    crack_floor_count_max: int = 3,
     paint_peel_count_min: int = 5,
     paint_peel_count_max: int = 10,
     paint_peel_ceiling_count_min: int = 1,
@@ -695,12 +701,14 @@ def home_furniture_constraints(
     # Cable trunks are spawned from wall/ceiling geometry after solve
     # (see room_cable_trunks), not by the furniture solver.
 
-    # Defects - separate category (walls only), each type has its own constraints
+    # Defects — walls, ceilings, and floors; each type has its own constraints
     defects = obj[Semantics.Defects]
     defects_wall = defects.related_to(rooms, cu.flush_wall_defect)
     defects_ceiling = defects.related_to(rooms, cu.flush_ceiling_defect)
+    defects_floor = defects.related_to(rooms, cu.flush_floor_defect)
     cracks_wall = defects_wall[CrackPlaneFactory]
     cracks_ceiling = defects_ceiling[CeilingCrackPlaneFactory]
+    cracks_floor = defects_floor[FloorCrackPlaneFactory]
     paint_peel_wall = defects_wall[PaintPeelPlaneFactory]
     paint_peel_ceiling = defects_ceiling[CeilingPeelFactory]
     # spalling_wall = defects_wall[SpallingPlaneFactory]  # commented out
@@ -833,6 +841,15 @@ def home_furniture_constraints(
             * cracks_ceiling.related_to(r).all(
                 lambda t: (
                     (t.distance(r, cu.ceilingtags).in_range(0.0, 0.02))
+                    * (t.distance(cutters) > 0.30)
+                )
+            )
+            * cracks_floor.related_to(r)
+            .count()
+            .in_range(crack_floor_count_min, crack_floor_count_max)
+            * cracks_floor.related_to(r).all(
+                lambda t: (
+                    (t.distance(r, cu.floortags).in_range(0.0, 0.02))
                     * (t.distance(cutters) > 0.30)
                 )
             )
@@ -1104,6 +1121,16 @@ def home_furniture_constraints(
                     d.distance(r, cu.ceilingtags).minimize(weight=10)
                     + d.distance(cracks_ceiling).maximize(weight=1)
                     + d.distance(cracks_wall).maximize(weight=0.4)
+                    + cl.center_stable_surface_dist(d).minimize(weight=1)
+                )
+            )
+            + cracks_floor.related_to(r).mean(
+                lambda d: (
+                    d.distance(r, cu.floortags).minimize(weight=10)
+                    + d.distance(cracks_floor).maximize(weight=1)
+                    + d.distance(cracks_wall).maximize(weight=0.4)
+                    + d.distance(cracks_ceiling).maximize(weight=0.3)
+                    + cl.accessibility_cost(d, furniture, dist=0.4).minimize(weight=3)
                     + cl.center_stable_surface_dist(d).minimize(weight=1)
                 )
             )

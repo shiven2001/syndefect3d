@@ -625,12 +625,17 @@ def pose_defect_cameras(
             target = shuffled[idx % len(shuffled)]
         target_loc = Vector(target.matrix_world.translation)
 
-        # The back face (-X) is flush against the wall, so the room-facing
-        # direction is local +X.
         local_normal = Vector((1, 0, 0))
+        surface = target.get("syndefect_surface", "wall")
+        if surface == "floor":
+            local_normal = Vector((0, 0, 1))
+        elif surface == "ceiling":
+            local_normal = Vector((0, 0, -1))
         world_normal = (
             target.matrix_world.to_3x3() @ local_normal
         ).normalized()
+        if world_normal.length < 1e-6:
+            world_normal = Vector((0.0, 0.0, 1.0 if surface == "floor" else -1.0))
 
         placed = False
         for attempt in range(max_retries):

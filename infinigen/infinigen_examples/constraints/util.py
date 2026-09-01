@@ -72,6 +72,9 @@ flush_wall_defect = cl.StableAgainst(
 flush_ceiling_defect = cl.StableAgainst(
     top, ceilingtags, margin=0.001
 )  # Hairline-flush to ceiling
+flush_floor_defect = cl.StableAgainst(
+    bottom, floortags, margin=0.001
+)  # Hairline-flush to floor
 against_wall = cl.StableAgainst(back, walltags, margin=0.07)
 spaced_wall = cl.StableAgainst(back, walltags, margin=0.8)
 hanging = cl.StableAgainst(top, ceilingtags, margin=0.005)  # 1mm from ceiling - flush

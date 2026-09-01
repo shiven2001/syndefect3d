@@ -92,26 +92,201 @@ def scene_peel_substrate():
     return _SCENE_SUBSTRATE
 
 
-def create_paint_peel_material(name: str, seed: int) -> bpy.types.Material:
-    """Paint peel as a two-layer film: intact paint is transparent (real wall
-    shows through); peeled patches are a grainy plaster substrate with a thin
-    lifted lip. Substrate tint is scene-wide; patch shape is per instance.
+# Generated UV axes after the wall/ceiling plane is applied.
+# Wall: YZ face; ceiling: XY face.
+_AXES = {"wall": (1, 2), "ceiling": (0, 1)}
+
+
+def _disable_peel_lighting(obj: bpy.types.Object) -> None:
+    """Peel is a film on the plaster, not a card that shades the wall."""
+    obj.visible_shadow = False
+    obj.visible_diffuse = False
+    if hasattr(obj, "visible_glossy"):
+        obj.visible_glossy = False
+    if hasattr(obj, "visible_transmission"):
+        obj.visible_transmission = False
+    if hasattr(obj, "visible_volume_scatter"):
+        obj.visible_volume_scatter = False
+
+
+def _fit_radius(cx, cy, rx, limit=0.27):
+    """Keep |centre| + radius inside the plane so flakes never clip the border."""
+    return min(rx, max(0.004, limit - max(abs(cx), abs(cy))))
+
+
+def _ellipse_spec(cx, cy, rx, mode="add"):
+    rx = _fit_radius(cx, cy, rx)
+    ry = _fit_radius(cx, cy, rx * float(np.random.uniform(0.45, 1.70)))
+    return {
+        "cx": float(cx),
+        "cy": float(cy),
+        "rx": float(max(rx, 0.004)),
+        "ry": float(max(ry, 0.004)),
+        "rot": float(np.random.uniform(0.0, 2.0 * np.pi)),
+        "mode": mode,
+    }
+
+
+def _sample_peel_layout():
+    """Explicit flake layouts, same idea as crack styles. Always centred."""
+    style = str(
+        np.random.choice(
+            ["chip_trail", "islands", "torn_patch", "scattered"],
+            p=[0.30, 0.28, 0.24, 0.18],
+        )
+    )
+    specs = []
+    cx0 = float(np.random.uniform(-0.05, 0.05))
+    cy0 = float(np.random.uniform(-0.05, 0.05))
+
+    def add_blob(cx, cy, rx, n_lobes=0, n_bites=0):
+        specs.append(_ellipse_spec(cx, cy, rx, "add"))
+        parent = specs[-1]
+        for _ in range(n_lobes):
+            ang = float(np.random.uniform(0.0, 2.0 * np.pi))
+            dist = parent["rx"] * float(np.random.uniform(0.35, 0.85))
+            specs.append(
+                _ellipse_spec(
+                    parent["cx"] + dist * np.cos(ang),
+                    parent["cy"] + dist * np.sin(ang),
+                    parent["rx"] * float(np.random.uniform(0.35, 0.75)),
+                    "add",
+                )
+            )
+        for _ in range(n_bites):
+            ang = float(np.random.uniform(0.0, 2.0 * np.pi))
+            dist = parent["rx"] * float(np.random.uniform(0.70, 1.05))
+            specs.append(
+                _ellipse_spec(
+                    parent["cx"] + dist * np.cos(ang),
+                    parent["cy"] + dist * np.sin(ang),
+                    parent["rx"] * float(np.random.uniform(0.18, 0.48)),
+                    "sub",
+                )
+            )
+
+    if style == "chip_trail":
+        # Horizontal scrape of mixed chips (finger-scale up to a few cm).
+        axis = float(np.random.uniform(0.0, 2.0 * np.pi))
+        n_chips = int(np.random.randint(6, 13))
+        half = float(np.random.uniform(0.09, 0.16))
+        for i in range(n_chips):
+            t = float(np.random.uniform(-half, half))
+            jx = float(np.random.uniform(-0.025, 0.025))
+            jy = float(np.random.uniform(-0.025, 0.025))
+            cx = cx0 + t * np.cos(axis) + jx
+            cy = cy0 + t * np.sin(axis) + jy
+            rx = float(
+                np.random.uniform(0.028, 0.055)
+                if i == 0
+                else np.random.uniform(0.006, 0.028)
+            )
+            add_blob(cx, cy, rx, n_lobes=int(np.random.rand() < 0.35), n_bites=0)
+    elif style == "islands":
+        n_main = int(np.random.randint(2, 5))
+        for i in range(n_main):
+            ang = float(np.random.uniform(0.0, 2.0 * np.pi))
+            dist = 0.0 if i == 0 else float(np.random.uniform(0.04, 0.12))
+            cx = cx0 + dist * np.cos(ang)
+            cy = cy0 + dist * np.sin(ang)
+            rx = float(
+                np.random.uniform(0.055, 0.12)
+                if i == 0
+                else np.random.uniform(0.018, 0.055)
+            )
+            add_blob(
+                cx,
+                cy,
+                rx,
+                n_lobes=int(np.random.randint(1, 3)),
+                n_bites=int(np.random.randint(1, 3)),
+            )
+    elif style == "torn_patch":
+        add_blob(
+            cx0,
+            cy0,
+            float(np.random.uniform(0.09, 0.17)),
+            n_lobes=int(np.random.randint(2, 4)),
+            n_bites=int(np.random.randint(2, 5)),
+        )
+        n_sat = int(np.random.randint(3, 8))
+        for _ in range(n_sat):
+            ang = float(np.random.uniform(0.0, 2.0 * np.pi))
+            dist = float(np.random.uniform(0.06, 0.16))
+            add_blob(
+                cx0 + dist * np.cos(ang),
+                cy0 + dist * np.sin(ang),
+                float(np.random.uniform(0.007, 0.028)),
+                n_lobes=0,
+                n_bites=int(np.random.rand() < 0.4),
+            )
+    else:  # scattered mixed sizes
+        n_main = int(np.random.randint(3, 7))
+        for i in range(n_main):
+            ang = float(np.random.uniform(0.0, 2.0 * np.pi))
+            dist = 0.0 if i == 0 else float(np.random.uniform(0.03, 0.13))
+            rx = float(
+                np.random.uniform(0.04, 0.10)
+                if i == 0
+                else np.random.uniform(0.008, 0.045)
+            )
+            add_blob(
+                cx0 + dist * np.cos(ang),
+                cy0 + dist * np.sin(ang),
+                rx,
+                n_lobes=int(np.random.rand() < 0.55),
+                n_bites=int(np.random.rand() < 0.55),
+            )
+
+    n_specks = int(np.random.randint(2, 9))
+    for _ in range(n_specks):
+        ang = float(np.random.uniform(0.0, 2.0 * np.pi))
+        dist = float(np.random.uniform(0.02, 0.14))
+        add_blob(
+            cx0 + dist * np.cos(ang),
+            cy0 + dist * np.sin(ang),
+            float(np.random.uniform(0.004, 0.012)),
+        )
+    return style, specs
+
+
+def create_paint_peel_material(
+    name: str, seed: int, orientation: str = "wall"
+) -> bpy.types.Material:
+    """Centered delamination: torn-paper flakes, not a smooth ellipse.
+
+    Intact paint is transparent so the real wall shows through. Peeled patches
+    are a grainy plaster substrate with a millimetre paint lip. Substrate tint
+    is scene-wide; flake layout is per instance.
     """
     plaster_lo, plaster_hi, pit_tint, flake_color = scene_peel_substrate()
+    u_idx, v_idx = _AXES[orientation]
     with FixedSeed(seed):
-        patch_w = np.random.uniform(0.4, 3.2)
-        patch_scale = np.random.uniform(1.4, 3.2)
-        chip_scale = np.random.uniform(7.0, 16.0)
-        chip_amt = np.random.uniform(0.18, 0.38)
-        ramp0 = np.random.uniform(0.40, 0.46)
-        ramp1 = min(ramp0 + np.random.uniform(0.02, 0.045), 0.92)
+        _, peel_specs = _sample_peel_layout()
+        # Three-scale outline: coarse lobes, mid bays, fine brittle teeth.
+        warp_scale = np.random.uniform(3.5, 7.5)
+        warp_amp = np.random.uniform(0.028, 0.070)
+        mid_scale = np.random.uniform(16.0, 38.0)
+        mid_amp = np.random.uniform(0.018, 0.045)
+        teeth_scale = np.random.uniform(48.0, 110.0)
+        teeth_amp = np.random.uniform(0.10, 0.28)
+        ridge_scale = np.random.uniform(22.0, 55.0)
+        ridge_amp = np.random.uniform(0.08, 0.22)
+        cell_scale = np.random.uniform(14.0, 36.0)
+        cell_amp = np.random.uniform(0.06, 0.18)
+        island_scale = np.random.uniform(12.0, 28.0)
+        island_thr = np.random.uniform(0.74, 0.90)
+        island_amt = float(
+            0.0 if np.random.rand() < 0.28 else np.random.uniform(0.55, 1.0)
+        )
+        mapping_offset = tuple(np.random.uniform(0, 80, 3))
         grain_scale = np.random.uniform(70.0, 140.0)
         body_scale = np.random.uniform(14.0, 28.0)
         pit_scale = np.random.uniform(28.0, 55.0)
-        # Same invert-bump rim as the original peel (Distance ~20).
-        rim_strength = np.random.uniform(0.65, 1.15)
-        rim_distance = np.random.uniform(14.0, 22.0)
-        plaster_bump = np.random.uniform(0.35, 0.55)
+        # Paint-film thickness, not the old Distance~20 crater.
+        rim_strength = np.random.uniform(0.35, 0.80)
+        rim_distance = np.random.uniform(0.0014, 0.0036)
+        plaster_bump = np.random.uniform(0.22, 0.42)
 
     mat = bpy.data.materials.new(name=name)
     mat.use_nodes = True
@@ -119,61 +294,152 @@ def create_paint_peel_material(name: str, seed: int) -> bpy.types.Material:
     links = mat.node_tree.links
     nodes.clear()
 
-    node_output = nodes.new("ShaderNodeOutputMaterial")
-    tex = nodes.new("ShaderNodeTexCoord")
+    def node(kind, **props):
+        n = nodes.new(kind)
+        for k, val in props.items():
+            setattr(n, k, val)
+        return n
 
-    # --- Peel mask: large irregular patches plus smaller chips / islands ---
-    n_patch = nodes.new("ShaderNodeTexNoise")
-    n_patch.noise_dimensions = "4D"
-    n_patch.normalize = False
-    n_patch.noise_type = "FBM"
-    n_patch.inputs["W"].default_value = patch_w
-    n_patch.inputs["Scale"].default_value = patch_scale
-    n_patch.inputs["Detail"].default_value = 16.0
-    n_patch.inputs["Roughness"].default_value = 0.62
-    links.new(tex.outputs["Object"], n_patch.inputs["Vector"])
+    def math(op, a, b=None, clamp=False):
+        m = node("ShaderNodeMath", operation=op, use_clamp=clamp)
+        for i, operand in enumerate((a, b)):
+            if operand is None:
+                continue
+            if hasattr(operand, "is_linked"):
+                links.new(operand, m.inputs[i])
+            else:
+                m.inputs[i].default_value = operand
+        return m.outputs["Value"]
 
-    n_chip = nodes.new("ShaderNodeTexNoise")
-    n_chip.noise_dimensions = "3D"
-    n_chip.normalize = True
-    n_chip.noise_type = "FBM"
-    n_chip.inputs["Scale"].default_value = chip_scale
-    n_chip.inputs["Detail"].default_value = 8.0
-    n_chip.inputs["Roughness"].default_value = 0.7
-    links.new(tex.outputs["Object"], n_chip.inputs["Vector"])
+    def ramp(value, x0, x1, y0=0.0, y1=1.0, interp="LINEAR"):
+        mr = node("ShaderNodeMapRange", interpolation_type=interp, clamp=True)
+        for sock_name, operand in (
+            ("From Min", x0),
+            ("From Max", x1),
+            ("To Min", y0),
+            ("To Max", y1),
+        ):
+            if hasattr(operand, "is_linked"):
+                links.new(operand, mr.inputs[sock_name])
+            else:
+                mr.inputs[sock_name].default_value = operand
+        links.new(value, mr.inputs["Value"])
+        return mr.outputs["Result"]
 
-    mix_mask = nodes.new("ShaderNodeMixRGB")
-    mix_mask.blend_type = "ADD"
-    mix_mask.use_clamp = True
-    mix_mask.inputs["Fac"].default_value = chip_amt
-    links.new(n_patch.outputs["Fac"], mix_mask.inputs["Color1"])
-    links.new(n_chip.outputs["Fac"], mix_mask.inputs["Color2"])
+    def noise(vector, scale, detail=6.0, roughness=0.55, ntype="FBM"):
+        n = node("ShaderNodeTexNoise", noise_dimensions="3D", noise_type=ntype)
+        if hasattr(n, "normalize"):
+            n.normalize = True
+        n.inputs["Scale"].default_value = scale
+        n.inputs["Detail"].default_value = detail
+        n.inputs["Roughness"].default_value = roughness
+        links.new(vector, n.inputs["Vector"])
+        return n.outputs["Fac"]
 
-    peel_ramp = nodes.new("ShaderNodeValToRGB")
-    peel_ramp.color_ramp.elements.new(1.0)
-    peel_ramp.color_ramp.interpolation = "EASE"
-    peel_ramp.color_ramp.elements[0].position = ramp0
-    peel_ramp.color_ramp.elements[1].position = ramp1
-    peel_ramp.color_ramp.elements[2].position = 1.0
-    peel_ramp.color_ramp.elements[0].color = (0, 0, 0, 1)
-    peel_ramp.color_ramp.elements[1].color = (1, 1, 1, 1)
-    peel_ramp.color_ramp.elements[2].color = (1, 1, 1, 1)
-    links.new(mix_mask.outputs["Color"], peel_ramp.inputs["Fac"])
+    node_output = node("ShaderNodeOutputMaterial")
+    tex = node("ShaderNodeTexCoord")
+    # Generated is 0–1 across the mesh AABB, so flakes stay centred on any size plane.
+    sep = node("ShaderNodeSeparateXYZ")
+    links.new(tex.outputs["Generated"], sep.inputs["Vector"])
+    u = math("SUBTRACT", sep.outputs[u_idx], 0.5)
+    v = math("SUBTRACT", sep.outputs[v_idx], 0.5)
+
+    pattern_map = node("ShaderNodeMapping", vector_type="POINT")
+    for i in range(3):
+        pattern_map.inputs["Location"].default_value[i] = mapping_offset[i]
+    links.new(tex.outputs["Object"], pattern_map.inputs["Vector"])
+    pattern = pattern_map.outputs["Vector"]
+
+    uv = node("ShaderNodeCombineXYZ")
+    links.new(u, uv.inputs["X"])
+    links.new(v, uv.inputs["Y"])
+    uvv = uv.outputs["Vector"]
+
+    # Domain warp: coarse lobes + mid-scale bays (torn paper, not a wobble).
+    wu = math("MULTIPLY", math("SUBTRACT", noise(uvv, warp_scale, 5.0, 0.62), 0.5), warp_amp * 2.0)
+    wv = math("MULTIPLY", math("SUBTRACT", noise(pattern, warp_scale * 1.37, 5.0, 0.58), 0.5), warp_amp * 2.0)
+    mu = math("MULTIPLY", math("SUBTRACT", noise(uvv, mid_scale, 6.0, 0.70), 0.5), mid_amp * 2.0)
+    mv = math("MULTIPLY", math("SUBTRACT", noise(pattern, mid_scale * 1.21, 6.0, 0.66), 0.5), mid_amp * 2.0)
+    u_w = math("ADD", math("ADD", u, wu), mu)
+    v_w = math("ADD", math("ADD", v, wv), mv)
+
+    teeth = math(
+        "MULTIPLY",
+        math("SUBTRACT", noise(uvv, teeth_scale, 8.0, 0.78), 0.5),
+        teeth_amp,
+    )
+    ridge = math(
+        "MULTIPLY",
+        math("SUBTRACT", noise(pattern, ridge_scale, 7.0, 0.72, "RIDGED_MULTIFRACTAL"), 0.5),
+        ridge_amp,
+    )
+    cells = node("ShaderNodeTexVoronoi", voronoi_dimensions="3D", feature="DISTANCE_TO_EDGE")
+    cells.inputs["Scale"].default_value = cell_scale
+    cells.inputs["Randomness"].default_value = 1.0
+    links.new(uvv, cells.inputs["Vector"])
+    cell_jag = math("MULTIPLY", math("SUBTRACT", 0.12, cells.outputs["Distance"]), cell_amp)
+    jag = math("ADD", math("ADD", teeth, ridge), cell_jag)
+
+    def flake_mask(spec):
+        """Jagged ellipse: SDF + multi-scale torn-paper offset."""
+        cu_ = math("SUBTRACT", u_w, spec["cx"])
+        cv_ = math("SUBTRACT", v_w, spec["cy"])
+        c, s = float(np.cos(spec["rot"])), float(np.sin(spec["rot"]))
+        ru = math("ADD", math("MULTIPLY", cu_, c), math("MULTIPLY", cv_, s))
+        rv = math("ADD", math("MULTIPLY", cu_, -s), math("MULTIPLY", cv_, c))
+        eu = math("DIVIDE", ru, max(spec["rx"], 1e-4))
+        ev = math("DIVIDE", rv, max(spec["ry"], 1e-4))
+        edist = math(
+            "POWER",
+            math("ADD", math("MULTIPLY", eu, eu), math("MULTIPLY", ev, ev)),
+            0.5,
+        )
+        return ramp(math("ADD", edist, jag), 0.86, 1.06, 1.0, 0.0, interp="LINEAR")
+
+    add_specs = [s for s in peel_specs if s["mode"] == "add"]
+    sub_specs = [s for s in peel_specs if s["mode"] == "sub"]
+    peel = flake_mask(add_specs[0])
+    for spec in add_specs[1:]:
+        peel = math("MAXIMUM", peel, flake_mask(spec), clamp=True)
+    for spec in sub_specs:
+        bite = flake_mask(spec)
+        peel = math("MULTIPLY", peel, math("SUBTRACT", 1.0, math("MULTIPLY", bite, 0.92)), clamp=True)
+
+    if island_amt > 0.01:
+        isl = noise(pattern, island_scale, 6.0, 0.62)
+        deep = ramp(peel, 0.55, 0.92, 0.0, 1.0, interp="SMOOTHSTEP")
+        holes = math(
+            "MULTIPLY",
+            ramp(isl, island_thr, min(island_thr + 0.07, 0.98), 0.0, 1.0),
+            math("MULTIPLY", deep, island_amt),
+            clamp=True,
+        )
+        peel = math("MULTIPLY", peel, math("SUBTRACT", 1.0, holes), clamp=True)
+
+    # Box falloff so flakes die before any of the four plane edges.
+    keep = math(
+        "MULTIPLY",
+        ramp(math("ABSOLUTE", u), 0.30, 0.42, 1.0, 0.0, interp="SMOOTHSTEP"),
+        ramp(math("ABSOLUTE", v), 0.30, 0.42, 1.0, 0.0, interp="SMOOTHSTEP"),
+        clamp=True,
+    )
+    peel = math("MULTIPLY", peel, keep, clamp=True)
+    peel_ramp_out = peel
 
     # Lip / curl ring: peaks at the paint–substrate boundary.
     one_minus = nodes.new("ShaderNodeMath")
     one_minus.operation = "SUBTRACT"
     one_minus.inputs[0].default_value = 1.0
-    links.new(peel_ramp.outputs["Color"], one_minus.inputs[1])
+    links.new(peel_ramp_out, one_minus.inputs[1])
 
     edge = nodes.new("ShaderNodeMath")
     edge.operation = "MULTIPLY"
-    links.new(peel_ramp.outputs["Color"], edge.inputs[0])
+    links.new(peel_ramp_out, edge.inputs[0])
     links.new(one_minus.outputs["Value"], edge.inputs[1])
 
     edge_amp = nodes.new("ShaderNodeMath")
     edge_amp.operation = "MULTIPLY"
-    edge_amp.inputs[1].default_value = 4.0
+    edge_amp.inputs[1].default_value = 5.0
     links.new(edge.outputs["Value"], edge_amp.inputs[0])
 
     # --- Substrate: sandy plaster (body + fine grain + pits) ---
@@ -232,7 +498,7 @@ def create_paint_peel_material(name: str, seed: int) -> bpy.types.Material:
     crease = nodes.new("ShaderNodeMixRGB")
     crease.blend_type = "MULTIPLY"
     crease.inputs["Fac"].default_value = 0.18
-    crease.inputs["Color2"].default_value = (0.42, 0.40, 0.37, 1.0)
+    crease.inputs["Color2"].default_value = (0.62, 0.58, 0.52, 1.0)
     links.new(plaster_col.outputs["Color"], crease.inputs["Color1"])
     links.new(edge_amp.outputs["Value"], crease.inputs["Fac"])
 
@@ -273,22 +539,12 @@ def create_paint_peel_material(name: str, seed: int) -> bpy.types.Material:
     bump_plaster.inputs["Distance"].default_value = 0.0025
     links.new(h2.outputs["Value"], bump_plaster.inputs["Height"])
 
-    # Original peel rim: sharp invert bump on the mask (power 5, *2, Distance ~20).
-    rim_pow = nodes.new("ShaderNodeMath")
-    rim_pow.operation = "POWER"
-    rim_pow.inputs[1].default_value = 5.0
-    links.new(peel_ramp.outputs["Color"], rim_pow.inputs[0])
-
-    rim_mul = nodes.new("ShaderNodeMath")
-    rim_mul.operation = "MULTIPLY"
-    rim_mul.inputs[1].default_value = 2.0
-    links.new(rim_pow.outputs["Value"], rim_mul.inputs[0])
-
+    # Millimetre paint-film step at the torn edge — not a 20 m crater.
     bump_lip = nodes.new("ShaderNodeBump")
     bump_lip.invert = True
     bump_lip.inputs["Strength"].default_value = rim_strength
     bump_lip.inputs["Distance"].default_value = rim_distance
-    links.new(rim_mul.outputs["Value"], bump_lip.inputs["Height"])
+    links.new(peel_ramp_out, bump_lip.inputs["Height"])
     links.new(bump_plaster.outputs["Normal"], bump_lip.inputs["Normal"])
 
     rough = nodes.new("ShaderNodeMath")
@@ -307,7 +563,7 @@ def create_paint_peel_material(name: str, seed: int) -> bpy.types.Material:
     links.new(paint_mix.outputs["Color"], bsdf.inputs["Base Color"])
     links.new(rough_sub.outputs["Value"], bsdf.inputs["Roughness"])
     links.new(bump_lip.outputs["Normal"], bsdf.inputs["Normal"])
-    links.new(peel_ramp.outputs["Color"], bsdf.inputs["Alpha"])
+    links.new(peel_ramp_out, bsdf.inputs["Alpha"])
     spec_key = (
         "Specular IOR Level" if "Specular IOR Level" in bsdf.inputs else "Specular"
     )
@@ -317,7 +573,9 @@ def create_paint_peel_material(name: str, seed: int) -> bpy.types.Material:
 
     mat.blend_method = "CLIP"
     if hasattr(mat, "shadow_method"):
-        mat.shadow_method = "CLIP"
+        mat.shadow_method = "NONE"
+    if hasattr(mat, "alpha_threshold"):
+        mat.alpha_threshold = 0.42
     return mat
 
 
@@ -350,10 +608,10 @@ class PaintPeelPlaneFactory(AssetFactory):
         mat = create_paint_peel_material(
             name=f"PaintPeelMaterial_{id(plane)}",
             seed=int_hash((self.factory_seed, kwargs.get("i", 0))),
+            orientation="wall",
         )
         plane.data.materials.append(mat)
-        plane.visible_shadow = False
-        plane.visible_diffuse = False
+        _disable_peel_lighting(plane)
         return plane
 
     def finalize_assets(self, assets):
@@ -417,10 +675,10 @@ class CeilingPeelFactory(AssetFactory):
         mat = create_paint_peel_material(
             name=f"PaintPeelMaterial_{id(plane)}",
             seed=int_hash((self.factory_seed, kwargs.get("i", 0))),
+            orientation="ceiling",
         )
         plane.data.materials.append(mat)
-        plane.visible_shadow = False
-        plane.visible_diffuse = False
+        _disable_peel_lighting(plane)
         return plane
 
     def finalize_assets(self, assets):

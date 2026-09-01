@@ -17,14 +17,18 @@ from infinigen.core.util.math import FixedSeed, int_hash
 logger = logging.getLogger(__name__)
 
 
-# Sink unused (transparent) grid slightly into the wall so coplanar film
-# cannot catch light or contact-shadow a rectangle onto the plaster.
-EMBED_DEPTH = 0.0002
+# Unused film is displaced this far into the host so coplanar verts cannot
+# catch light. Combined with SOLVER_FLUSH_MARGIN this also eats the 1 mm
+# StableAgainst gap so the decal is not a proud card that shades the wall.
+EMBED_DEPTH = 0.0004
 
 # Half-thickness of the placeholder bbox below. The solver seats the
-# placeholder's BACK face against the wall, but the asset is built at the
-# placeholder's centre, so it is born this far proud of the plaster.
+# placeholder's BACK/TOP/BOTTOM face against the host, but the asset is
+# built at the placeholder's centre, so it is born this far proud.
 PLACEHOLDER_HALF_T = 0.005
+
+# Must match flush_*_defect.margin in constraints/util.py.
+SOLVER_FLUSH_MARGIN = 0.001
 
 # Lift the channel floor to the wall surface inside the damage mask only.
 MIN_PROUD = 0.00008
@@ -35,9 +39,31 @@ MIN_PROUD = 0.00008
 TARGET_QUAD_M = 0.0012
 MAX_GRID_SUBDIV = 640
 
-# Wall planes face local +X (rotated), ceiling planes face local +Z.
+# Wall planes face local +X (rotated); ceiling and floor face local +Z.
 # (u, v, rotation-axis) index triples into the Object coordinate.
-_AXES = {"wall": (1, 2, 0), "ceiling": (0, 1, 2)}
+_AXES = {"wall": (1, 2, 0), "ceiling": (0, 1, 2), "floor": (0, 1, 2)}
+
+
+def _host_embed() -> float:
+    """Metres from placeholder centre to just inside the host surface."""
+    return PLACEHOLDER_HALF_T + SOLVER_FLUSH_MARGIN + EMBED_DEPTH
+
+
+def _disable_decal_lighting(obj: bpy.types.Object) -> None:
+    """A crack is a mark on the plaster, not a floating card that shades it.
+
+    Shadow and GI rays hitting unused film are what print the dark rectangle
+    on the wall/ceiling behind the plane. Camera rays stay on so the fissure
+    itself is still visible.
+    """
+    obj.visible_shadow = False
+    obj.visible_diffuse = False
+    if hasattr(obj, "visible_glossy"):
+        obj.visible_glossy = False
+    if hasattr(obj, "visible_transmission"):
+        obj.visible_transmission = False
+    if hasattr(obj, "visible_volume_scatter"):
+        obj.visible_volume_scatter = False
 
 
 def grid_subdivisions(extent_m: float) -> int:
@@ -208,14 +234,29 @@ def create_crack_material(
         peel_scale = np.random.uniform(8.0, 22.0)
         peel_h = np.random.uniform(0.0005, 0.0020)
 
-        pv = np.random.uniform(0.70, 0.86)
-        paint_col = (pv, pv * 0.995, pv * 0.978, 1.0)
-        sv = min(pv * np.random.uniform(0.82, 0.94), 0.90)
-        substrate_col = (sv, sv * 0.985, sv * 0.955, 1.0)
-        dv = pv * np.random.uniform(0.04, 0.18)
-        crack_dark = (dv, dv * 0.97, dv * 0.93, 1.0)
-        paint_rough = np.random.uniform(0.52, 0.68)
-        substrate_rough = np.random.uniform(0.88, 0.97)
+        if orientation == "floor":
+            # Cavity, not a wood stain. Albedo is retinted from the host
+            # floor after room_floors so light oak, dark walnut, ceramic,
+            # and concrete all get a darker split of the same hue.
+            g = float(np.random.uniform(0.035, 0.07))
+            paint_col = (g, g * 0.97, g * 0.93, 1.0)
+            substrate_col = paint_col
+            crack_dark = (g * 0.45, g * 0.42, g * 0.38, 1.0)
+            paint_rough = np.random.uniform(0.78, 0.94)
+            substrate_rough = np.random.uniform(0.88, 0.97)
+            lip_strength = 0.0
+            h_lip = 0.0
+            peel_chance = 0.0
+            peel_h = 0.0
+        else:
+            pv = np.random.uniform(0.70, 0.86)
+            paint_col = (pv, pv * 0.995, pv * 0.978, 1.0)
+            sv = min(pv * np.random.uniform(0.82, 0.94), 0.90)
+            substrate_col = (sv, sv * 0.985, sv * 0.955, 1.0)
+            dv = pv * np.random.uniform(0.04, 0.18)
+            crack_dark = (dv, dv * 0.97, dv * 0.93, 1.0)
+            paint_rough = np.random.uniform(0.52, 0.68)
+            substrate_rough = np.random.uniform(0.88, 0.97)
 
         roller_freq = np.random.uniform(80.0, 160.0)
         roller_aniso = np.random.uniform(4.0, 9.0)
@@ -475,10 +516,12 @@ def create_crack_material(
     links.new(height, disp.inputs["Height"])
 
     base_mix = node("ShaderNodeMixRGB", blend_type="MIX", use_clamp=True)
+    base_mix.name = "CrackAlbedoMix"
     base_mix.inputs["Color1"].default_value = paint_col
     base_mix.inputs["Color2"].default_value = substrate_col
     links.new(peel, base_mix.inputs["Fac"])
     base_col = node("ShaderNodeMixRGB", blend_type="MIX", use_clamp=True)
+    base_col.name = "CrackDarkMix"
     base_col.inputs["Color2"].default_value = crack_dark
     links.new(base_mix.outputs["Color"], base_col.inputs["Color1"])
     links.new(channel, base_col.inputs["Fac"])
@@ -536,6 +579,101 @@ def create_crack_material(
     return mat
 
 
+def _room_stem(name: str) -> str:
+    if name.endswith((".wall", ".ceiling", ".floor")):
+        return name.rsplit(".", 1)[0]
+    return name.split(".")[0]
+
+
+def _mean_material_rgb(mat: bpy.types.Material):
+    """Representative albedo from a procedural floor shader (ramps / RGB nodes)."""
+    if mat is None or not getattr(mat, "use_nodes", False) or mat.node_tree is None:
+        return None
+    samples = []
+    for n in mat.node_tree.nodes:
+        if n.type == "VALTORGB":
+            for el in n.color_ramp.elements:
+                samples.append(tuple(el.color[:3]))
+        elif n.type == "RGB":
+            samples.append(tuple(n.outputs[0].default_value[:3]))
+        elif n.type == "BSDF_PRINCIPLED":
+            sock = n.inputs.get("Base Color")
+            if sock is not None and not sock.is_linked:
+                samples.append(tuple(sock.default_value[:3]))
+    if not samples:
+        return None
+    # Drop mortar/grout blacks and unused whites so wood/tile midtones win.
+    mid = [
+        c
+        for c in samples
+        if 0.06 < (c[0] + c[1] + c[2]) / 3.0 < 0.92
+    ]
+    use = mid or samples
+    return tuple(float(np.mean([c[i] for c in use])) for i in range(3))
+
+
+def _cavity_from_host(rgb):
+    """Dark split of the host hue: reads as a crack on light and dark floors."""
+    r, g, b = (max(0.0, float(c)) for c in rgb[:3])
+    lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    if lum < 0.16:
+        scale = 0.42
+    elif lum < 0.38:
+        scale = 0.24
+    else:
+        scale = 0.15
+    return tuple(min(0.16, max(0.016, c * scale)) for c in (r, g, b)) + (1.0,)
+
+
+def _set_floor_crack_albedo(mat: bpy.types.Material, host_rgb) -> None:
+    cavity = _cavity_from_host(host_rgb)
+    fissure = tuple(max(0.012, c * 0.42) for c in cavity[:3]) + (1.0,)
+    albedo = mat.node_tree.nodes.get("CrackAlbedoMix")
+    dark = mat.node_tree.nodes.get("CrackDarkMix")
+    if albedo is not None:
+        albedo.inputs["Color1"].default_value = cavity
+        albedo.inputs["Color2"].default_value = cavity
+    if dark is not None:
+        dark.inputs["Color2"].default_value = fissure
+
+
+def tint_floor_cracks_from_host(state, floors) -> int:
+    """After room_floors: retint floor-crack film from the actual floor shader.
+
+    The crack is a cavity in the host finish (parquet, plank, ceramic, concrete),
+    not a baked wall-paint or walnut overlay.
+    """
+    floor_by_stem = {_room_stem(f.name): f for f in (floors or []) if f is not None}
+    n = 0
+    for os in getattr(state, "objs", {}).values():
+        gen = getattr(os, "generator", None)
+        if gen is None or gen.__class__.__name__ != "FloorCrackPlaneFactory":
+            continue
+        obj = os.obj
+        if obj is None or obj.type != "MESH" or not obj.data.materials:
+            continue
+        hosts = [_room_stem(r.target_name) for r in os.relations]
+        floor_obj = next((floor_by_stem[h] for h in hosts if h in floor_by_stem), None)
+        host_rgb = None
+        if floor_obj is not None:
+            mats = [floor_obj.active_material]
+            mats.extend(m for m in getattr(floor_obj.data, "materials", []) if m)
+            for mat in mats:
+                host_rgb = _mean_material_rgb(mat)
+                if host_rgb is not None:
+                    break
+        if host_rgb is None:
+            continue
+        for cmat in obj.data.materials:
+            if cmat is None:
+                continue
+            _set_floor_crack_albedo(cmat, host_rgb)
+            n += 1
+    if n:
+        logger.info("Tinted %s floor crack materials from host floor albedo", n)
+    return n
+
+
 class CrackPlaneFactory(AssetFactory):
     """Procedural wall-mounted crack plane (hairline cracks). Uses same placement and scoring as defect planes."""
 
@@ -583,16 +721,13 @@ class CrackPlaneFactory(AssetFactory):
             orientation="wall",
         )
         plane.data.materials.append(mat)
-        plane.visible_shadow = False
-        plane.visible_diffuse = False
+        plane["syndefect_surface"] = "wall"
+        _disable_decal_lighting(plane)
         return plane
 
     def finalize_assets(self, assets):
-        """Embed crack planes into the wall (same as StaticDefectPlaneFactory)."""
-        # Seat the plane on the wall surface. The film has zero height there,
-        # so it lies flush with no gap to cast a rectangle across; the damage
-        # is lifted onto the plaster by the shader instead.
-        EMBED_OFFSET = -(PLACEHOLDER_HALF_T + EMBED_DEPTH)
+        """Seat the plane just inside the plaster so unused film cannot shade it."""
+        EMBED_OFFSET = -_host_embed()
         for obj in assets:
             if obj.type != "MESH" or not obj.data.polygons:
                 continue
@@ -618,6 +753,7 @@ class CrackPlaneFactory(AssetFactory):
                 wall_normal = np.array(butil.global_polygon_normal(obj, back_poly))
                 translation = Vector(wall_normal * EMBED_OFFSET)
                 obj.location += translation
+                _disable_decal_lighting(obj)
             except Exception as e:
                 logger.warning("Failed to embed crack plane %s: %s", obj.name, e)
 
@@ -659,14 +795,14 @@ class CeilingCrackPlaneFactory(AssetFactory):
             orientation="ceiling",
         )
         plane.data.materials.append(mat)
-        plane.visible_shadow = False
-        plane.visible_diffuse = False
+        plane["syndefect_surface"] = "ceiling"
+        _disable_decal_lighting(plane)
         return plane
 
     def finalize_assets(self, assets):
         # `top_poly`'s normal already points up at the ceiling, so this offset
         # is positive - negating it drove the plane down, away from the slab.
-        EMBED_OFFSET = PLACEHOLDER_HALF_T
+        EMBED_OFFSET = _host_embed()
         for obj in assets:
             if obj.type != "MESH" or not obj.data.polygons:
                 continue
@@ -687,7 +823,67 @@ class CeilingCrackPlaneFactory(AssetFactory):
                     )
                 ceil_normal = np.array(butil.global_polygon_normal(obj, top_poly))
                 obj.location += Vector(ceil_normal * EMBED_OFFSET)
+                _disable_decal_lighting(obj)
             except Exception as e:
                 logger.warning(
                     "Failed to embed ceiling crack plane %s: %s", obj.name, e
+                )
+
+
+class FloorCrackPlaneFactory(AssetFactory):
+    """Same crack material as walls, seated flush on the floor (Bottom vs floor)."""
+
+    def __init__(self, factory_seed, coarse=False):
+        super().__init__(factory_seed, coarse)
+        with FixedSeed(factory_seed):
+            self.plane_size = np.random.uniform(0.5, 1.5)
+
+    def create_placeholder(self, **kwargs):
+        # Horizontal thin box: Top/Bottom are the large faces for sitting.
+        ph = new_bbox(
+            -0.5, 0.5, -0.5, 0.5, -PLACEHOLDER_HALF_T, PLACEHOLDER_HALF_T
+        )
+        butil.modify_mesh(ph, "TRIANGULATE", min_vertices=3)
+        tag_canonical_surfaces(ph)
+        return ph
+
+    def create_asset(self, placeholder=None, **kwargs) -> bpy.types.Object:
+        with FixedSeed(int_hash((self.factory_seed, kwargs.get("i", 0), "geom"))):
+            sx = np.random.uniform(0.5, 1.0) * self.plane_size / 2
+            sy = np.random.uniform(0.5, 1.0) * self.plane_size / 2
+            roll = float(np.random.uniform(-0.45, 0.45))
+        cuts = grid_subdivisions(2 * max(sx, sy))
+        bpy.ops.mesh.primitive_grid_add(
+            x_subdivisions=cuts, y_subdivisions=cuts, size=2, location=(0, 0, 0)
+        )
+        plane = bpy.context.active_object
+        butil.apply_transform(plane, loc=True)
+        plane.scale = (sx, sy, 1)
+        plane.rotation_euler = (0.0, 0.0, roll)
+        butil.apply_transform(plane, loc=False, rot=True, scale=True)
+        mat = create_crack_material(
+            name=f"CrackMaterial_{id(plane)}",
+            seed=int_hash((self.factory_seed, kwargs.get("i", 0))),
+            orientation="floor",
+        )
+        plane.data.materials.append(mat)
+        plane["syndefect_surface"] = "floor"
+        _disable_decal_lighting(plane)
+        return plane
+
+    def finalize_assets(self, assets):
+        # The grid faces +Z (into the room). Negative offset along that
+        # normal sinks the placeholder-centred mesh into the floor slab.
+        EMBED_OFFSET = -_host_embed()
+        for obj in assets:
+            if obj.type != "MESH" or not obj.data.polygons:
+                continue
+            try:
+                face = max(obj.data.polygons, key=lambda p: p.area)
+                floor_normal = np.array(butil.global_polygon_normal(obj, face))
+                obj.location += Vector(floor_normal * EMBED_OFFSET)
+                _disable_decal_lighting(obj)
+            except Exception as e:
+                logger.warning(
+                    "Failed to embed floor crack plane %s: %s", obj.name, e
                 )

@@ -4,7 +4,11 @@
 # Authors: Alexander Raistrick
 
 import infinigen.assets.static_assets as static_assets
-from infinigen.assets.crack_plane import CeilingCrackPlaneFactory, CrackPlaneFactory
+from infinigen.assets.crack_plane import (
+    CeilingCrackPlaneFactory,
+    CrackPlaneFactory,
+    FloorCrackPlaneFactory,
+)
 from infinigen.assets.paint_peel_plane import (
     CeilingPeelFactory,
     PaintPeelPlaneFactory,
@@ -223,6 +227,7 @@ def home_asset_usage():
     used_as[Semantics.Defects] = {
         CrackPlaneFactory,
         CeilingCrackPlaneFactory,
+        FloorCrackPlaneFactory,
         PaintPeelPlaneFactory,
         CeilingPeelFactory,
         # SpallingPlaneFactory,  # commented out
@@ -285,6 +290,7 @@ def home_asset_usage():
     used_as[Semantics.RealPlaceholder] = {
         CrackPlaneFactory,  # use tagged placeholder directly (bbox path loses face tags)
         CeilingCrackPlaneFactory,
+        FloorCrackPlaneFactory,
         PaintPeelPlaneFactory,
         CeilingPeelFactory,
         # SpallingPlaneFactory,  # commented out
@@ -374,6 +380,7 @@ def home_asset_usage():
     used_as[Semantics.NoCollision] = {
         elements.RugFactory,
         bathroom.FloorDrainFactory,
+        FloorCrackPlaneFactory,
     }
 
     used_as[Semantics.NoChildren] = {
