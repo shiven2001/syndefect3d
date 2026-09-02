@@ -1,0 +1,53 @@
+# In-use / occupied apartment.
+#
+# Same core rooms as preoccupancy.gin, plus hallways, balcony, furniture,
+# table-top clutter, and floating clutter. Storeys are 1/2/3 with weights
+# 0.5 / 0.4 / 0.1; stairs spawn whenever n_stories > 1.
+#
+#   python -m infinigen_examples.generate_indoors --task coarse --seed 0 \
+#     --output_folder outputs/inuse/coarse \
+#     -g fast_solve.gin inuse.gin
+#
+# List this file last. Do not combine with *_minimal.gin: those strip furniture
+# and pin a single room.
+
+include 'infinigen_examples/configs_indoor/realism_v2.gin'
+
+home_room_constraints.has_fewer_rooms = False
+# P(1 storey)=0.5, P(2)=0.4, P(3)=0.1. Stairs only exist when n_stories > 1.
+RoomConstants.n_stories = ("cat", 0.0, 0.5, 0.4, 0.1)
+
+BlueprintSolidifier.enable_open = False
+restrict_solving.solve_max_rooms = None
+restrict_solving.restrict_parent_rooms = None
+restrict_solving.consgraph_filters = None
+compose_indoors.hide_other_rooms_enabled = False
+compose_indoors.restrict_single_supported_roomtype = False
+compose_indoors.terrain_enabled = False
+
+compose_indoors.solve_small_enabled = True
+compose_indoors.solve_medium_enabled = True
+compose_indoors.solve_large_enabled = True
+compose_indoors.floating_objs_enabled = True
+compose_indoors.num_floating = ("discrete_uniform", 8, 16)
+compose_indoors.norm_floating_size = True
+
+home_furniture_constraints.kitchen_island_enabled = True
+home_furniture_constraints.kitchen_oven_enabled = True
+home_furniture_constraints.kitchen_dishwasher_enabled = True
+home_furniture_constraints.kitchen_fridge_enabled = True
+home_furniture_constraints.kitchen_microwave_enabled = True
+
+FloorPlanSolver.n_divide_trials = 100
+FloorPlanSolver.iters_mult = 200
+solve_objects.addition_weight_scalar = 3.0
+compose_indoors.solve_steps_large = 300
+compose_indoors.solve_steps_medium = 200
+compose_indoors.solve_steps_small = 50
+
+# Occupied rooms are not always fully lit.
+compose_indoors.lights_off_chance = 0.25
+compose_indoors.skirting_floor_chance = 1.0
+compose_indoors.skirting_ceiling_chance = 0.7
+populate_doors.all_closed = False
+populate_doors.door_chance = 1.0

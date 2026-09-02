@@ -1,0 +1,78 @@
+# Pre-occupancy / handover apartment.
+#
+# Whole-unit floor plan (bedroom, bath, kitchen, living, dining) plus hallways
+# and a balcony. No occupant furniture or clutter. Kitchen/bath fixtures stay.
+# One storey, so no stairs; pass RoomConstants.n_stories=2 if you want them.
+#
+#   python -m infinigen_examples.generate_indoors --task coarse --seed 0 \
+#     --output_folder outputs/preoccupancy/coarse \
+#     -g fast_solve.gin preoccupancy.gin
+#
+# Do not combine with *_minimal.gin / singleroom.gin: those pin one room type
+# and hide the rest. List this file last so it wins over fast_solve.gin.
+
+include 'infinigen_examples/configs_indoor/realism_v2.gin'
+
+# Full grammar: hallways + balcony. has_fewer_rooms drops both.
+home_room_constraints.has_fewer_rooms = False
+RoomConstants.n_stories = 1
+
+BlueprintSolidifier.enable_open = False
+restrict_solving.solve_max_rooms = None
+restrict_solving.restrict_parent_rooms = None
+compose_indoors.hide_other_rooms_enabled = False
+compose_indoors.restrict_single_supported_roomtype = False
+compose_indoors.terrain_enabled = False
+
+# Fixtures + defects only. Substring match on constraint names — do not add
+# "bedroom" / "livingroom" / "dining" or beds and sofas come back.
+restrict_solving.consgraph_filters = [
+    "ceiling_lights",
+    "cracks",
+    "paint_peel",
+    "wall_bubbles",
+    "paint_runs",
+    "paint_patches",
+    "weak_leak_stain",
+    "ac_units",
+    "wall_plugs",
+    "light_switches",
+    "faucets",
+    "kitchen_counter",
+    "kitchen_island",
+    "kitchen_sink",
+    "kitchen_appliance",
+    "bathroom",
+    "toilet",
+    "bathtub",
+    "showers",
+    "vanities",
+    "exhaust_fans",
+    "floor_drains",
+    "medicine_cabinets",
+    "toilet_paper",
+]
+
+compose_indoors.solve_small_enabled = True
+compose_indoors.solve_medium_enabled = True
+compose_indoors.solve_large_enabled = True
+compose_indoors.floating_objs_enabled = False
+
+home_furniture_constraints.kitchen_island_enabled = False
+home_furniture_constraints.kitchen_oven_enabled = True
+home_furniture_constraints.kitchen_dishwasher_enabled = False
+home_furniture_constraints.kitchen_fridge_enabled = False
+home_furniture_constraints.kitchen_microwave_enabled = False
+
+FloorPlanSolver.n_divide_trials = 100
+FloorPlanSolver.iters_mult = 200
+solve_objects.addition_weight_scalar = 3.0
+compose_indoors.solve_steps_large = 100
+compose_indoors.solve_steps_medium = 200
+compose_indoors.solve_steps_small = 30
+
+compose_indoors.lights_off_chance = 0.0
+compose_indoors.skirting_floor_chance = 1.0
+compose_indoors.skirting_ceiling_chance = 1.0
+populate_doors.all_closed = True
+populate_doors.door_chance = 1.0
