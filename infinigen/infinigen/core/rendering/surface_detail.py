@@ -46,6 +46,8 @@ DEFECT_MATERIAL_PREFIXES = (
     "OpenWiringMaterial",
     "PaintRunMaterial",
     "PaintPatchMaterial",
+    "CornerChipMaterial",
+    "TileChipMaterial",
 )
 
 
@@ -280,7 +282,12 @@ def disable_crack_plane_lighting():
         if obj.type != "MESH" or obj.data is None:
             continue
         mats = [m for m in obj.data.materials if m is not None]
-        if not any((m.name or "").startswith("CrackMaterial") for m in mats):
+        if not any(
+            (m.name or "").startswith(
+                ("CrackMaterial", "CornerChipMaterial", "TileChipMaterial")
+            )
+            for m in mats
+        ):
             continue
         obj.visible_shadow = False
         obj.visible_diffuse = False
@@ -292,7 +299,9 @@ def disable_crack_plane_lighting():
             obj.visible_volume_scatter = False
         n_obj += 1
         for mat in mats:
-            if not (mat.name or "").startswith("CrackMaterial"):
+            if not (mat.name or "").startswith(
+                ("CrackMaterial", "CornerChipMaterial", "TileChipMaterial")
+            ):
                 continue
             if hasattr(mat, "use_transparent_shadow"):
                 mat.use_transparent_shadow = False
@@ -301,5 +310,5 @@ def disable_crack_plane_lighting():
             n_mat += 1
     if n_obj:
         logger.info(
-            "Disabled lighting rays on %s crack planes (%s materials)", n_obj, n_mat
+            "Disabled lighting rays on %s crack/chip planes (%s materials)", n_obj, n_mat
         )

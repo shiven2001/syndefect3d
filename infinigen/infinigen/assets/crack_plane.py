@@ -233,6 +233,10 @@ def create_crack_material(
         )
         peel_scale = np.random.uniform(8.0, 22.0)
         peel_h = np.random.uniform(0.0005, 0.0020)
+        # Keep the lifted film off the mesh border so a raised lip cannot
+        # end as a cliff where the plane stops.
+        lip_border_dead = float(np.random.uniform(0.055, 0.10))
+        lip_border_fade = lip_border_dead + float(np.random.uniform(0.07, 0.13))
 
         if orientation == "floor":
             # Cavity, not a wood stain. Albedo is retinted from the host
@@ -248,21 +252,46 @@ def create_crack_material(
             h_lip = 0.0
             peel_chance = 0.0
             peel_h = 0.0
+            paint_col_lo = paint_col
+            film_mottle_a = 3.0
+            film_mottle_b = 1.6
+            peel_tex_scale = 70.0
+            peel_distortion = 0.8
+            roller_world_scale = 14.0
+            grain_tex_scale = 160.0
+            film_albedo_amt = 0.0
+            film_bump_dist = 0.0004
+            film_bump_str = 0.45
+            film_disp_micro = 0.0
         else:
             pv = np.random.uniform(0.70, 0.86)
             paint_col = (pv, pv * 0.995, pv * 0.978, 1.0)
+            lo_s = float(np.random.uniform(0.88, 0.96))
+            paint_col_lo = (
+                pv * lo_s,
+                pv * 0.995 * lo_s * 0.992,
+                pv * 0.978 * lo_s * 0.97,
+                1.0,
+            )
             sv = min(pv * np.random.uniform(0.82, 0.94), 0.90)
             substrate_col = (sv, sv * 0.985, sv * 0.955, 1.0)
             dv = pv * np.random.uniform(0.04, 0.18)
             crack_dark = (dv, dv * 0.97, dv * 0.93, 1.0)
             paint_rough = np.random.uniform(0.52, 0.68)
             substrate_rough = np.random.uniform(0.88, 0.97)
+            # Clone ceramic/plaster.py orange-peel in world metres so the
+            # raised lip keeps the wall's roller stipple instead of a smooth ridge.
+            film_mottle_a = float(np.random.uniform(2.2, 5.2))
+            film_mottle_b = float(np.random.uniform(1.1, 3.0))
+            peel_tex_scale = float(np.random.uniform(52.0, 95.0))
+            peel_distortion = float(np.random.uniform(0.5, 2.0))
+            roller_world_scale = float(np.random.uniform(8.0, 22.0))
+            grain_tex_scale = float(np.random.uniform(140.0, 260.0))
+            film_albedo_amt = float(np.random.uniform(0.22, 0.40))
+            film_bump_dist = float(np.random.uniform(0.0022, 0.0050))
+            film_bump_str = float(np.random.uniform(0.85, 1.25))
+            film_disp_micro = float(np.random.uniform(0.00055, 0.00120))
 
-        roller_freq = np.random.uniform(80.0, 160.0)
-        roller_aniso = np.random.uniform(4.0, 9.0)
-        roller_strength = np.random.uniform(0.06, 0.20)
-        grain_freq = np.random.uniform(90.0, 180.0)
-        grain_strength = np.random.uniform(0.02, 0.09)
         mapping_offset = tuple(np.random.uniform(0, 100, 3))
 
     mat = bpy.data.materials.new(name=name)
@@ -304,11 +333,13 @@ def create_crack_material(
                 m.inputs[i].default_value = operand
         return m.outputs["Value"]
 
-    def noise(vector, scale, detail=6.0, roughness=0.5):
-        n = node("ShaderNodeTexNoise", noise_dimensions="3D", noise_type="FBM")
+    def noise(vector, scale, detail=6.0, roughness=0.5, distortion=0.0, ntype="FBM"):
+        n = node("ShaderNodeTexNoise", noise_dimensions="3D", noise_type=ntype)
         n.inputs["Scale"].default_value = scale
         n.inputs["Detail"].default_value = detail
         n.inputs["Roughness"].default_value = roughness
+        if "Distortion" in n.inputs:
+            n.inputs["Distortion"].default_value = distortion
         links.new(vector, n.inputs["Vector"])
         return n.outputs["Fac"]
 
@@ -317,6 +348,48 @@ def create_crack_material(
     mapping = node("ShaderNodeMapping", vector_type="POINT")
     mapping.inputs["Rotation"].default_value[rot_idx] = crack_angle
     links.new(tex_coord.outputs["Object"], mapping.inputs["Vector"])
+
+    gsep = node("ShaderNodeSeparateXYZ")
+    links.new(tex_coord.outputs["Generated"], gsep.inputs["Vector"])
+
+    geom = node("ShaderNodeNewGeometry")
+    world = geom.outputs["Position"]
+    # Same recipe as shader_plaster: mottling + orange-peel + horizontal roller.
+    mottle_a = noise(world, film_mottle_a, 12.0, 0.55)
+    mottle_b = noise(world, film_mottle_b, 14.0, 0.62, distortion=0.8)
+    mottle_mix = node("ShaderNodeMixRGB", blend_type="DIFFERENCE", use_clamp=True)
+    mottle_mix.inputs["Fac"].default_value = 1.0
+    links.new(mottle_a, mottle_mix.inputs["Color1"])
+    links.new(mottle_b, mottle_mix.inputs["Color2"])
+    film_mottle = node("ShaderNodeSeparateRGB")
+    links.new(mottle_mix.outputs["Color"], film_mottle.inputs["Image"])
+    orange_peel = noise(world, peel_tex_scale, 11.0, 0.58, distortion=peel_distortion)
+    roller_map_w = node("ShaderNodeMapping", vector_type="POINT")
+    roller_map_w.inputs["Scale"].default_value = (0.18, 0.18, 1.0)
+    links.new(world, roller_map_w.inputs["Vector"])
+    roller_n = noise(
+        roller_map_w.outputs["Vector"],
+        roller_world_scale,
+        5.0,
+        0.45,
+        ntype="MULTIFRACTAL",
+    )
+    grain_n = noise(world, grain_tex_scale, 8.0, 0.72)
+    film_h = math(
+        "ADD",
+        math("ADD", math("MULTIPLY", orange_peel, 0.55), math("MULTIPLY", roller_n, 0.30)),
+        math("MULTIPLY", grain_n, 0.15),
+    )
+
+    def _edge_clearance(axis):
+        return math("MINIMUM", axis, math("SUBTRACT", 1.0, axis))
+
+    border_clear = math(
+        "MINIMUM",
+        _edge_clearance(gsep.outputs[u_idx]),
+        _edge_clearance(gsep.outputs[v_idx]),
+    )
+    lip_keep = ramp(border_clear, lip_border_dead, lip_border_fade, 0.0, 1.0)
 
     pattern_map = node("ShaderNodeMapping", vector_type="POINT")
     for i in range(3):
@@ -453,10 +526,10 @@ def create_crack_material(
     if micro_hair is not None:
         channel = math("MAXIMUM", channel, micro_hair, clamp=True)
 
-    peel_n = noise(pattern, peel_scale, 3.0, 0.4)
+    peel_patch_n = noise(pattern, peel_scale, 3.0, 0.4)
     peel = math(
         "MULTIPLY",
-        ramp(peel_n, peel_chance, min(peel_chance + 0.08, 0.98)),
+        ramp(peel_patch_n, peel_chance, min(peel_chance + 0.08, 0.98)),
         ramp(dist, w_max, w_max * 8.0, 1.0, 0.0),
     )
     if peel_chance < 0.05:
@@ -478,19 +551,23 @@ def create_crack_material(
     lip = math(
         "MULTIPLY",
         math("MULTIPLY", lip_profile, lip_side),
-        math("MULTIPLY", lift_amt, lip_strength),
+        math("MULTIPLY", math("MULTIPLY", lift_amt, lip_strength), lip_keep),
     )
 
     peel_curl = math(
         "MULTIPLY",
-        math("MULTIPLY", peel, ramp(dist, 0.0, w_max * 2.0, 0.15, 1.0)),
-        peel_h,
+        math(
+            "MULTIPLY",
+            math("MULTIPLY", peel, ramp(dist, 0.0, w_max * 2.0, 0.15, 1.0)),
+            peel_h,
+        ),
+        lip_keep,
     )
     crack_body = channel
     lift = math(
         "MULTIPLY",
-        ramp(crack_body, 0.06, 0.32),
-        crack_depth + MIN_PROUD,
+        math("MULTIPLY", ramp(crack_body, 0.06, 0.32), crack_depth + MIN_PROUD),
+        lip_keep,
     )
     carve = math("MULTIPLY", main_channel, crack_depth)
     if forks is not None:
@@ -503,6 +580,15 @@ def create_crack_material(
         math("MULTIPLY", lip, h_lip),
     )
     height = math("ADD", height, lift)
+    height = math(
+        "ADD",
+        height,
+        math(
+            "MULTIPLY",
+            math("MULTIPLY", math("SUBTRACT", film_h, 0.5), film_disp_micro),
+            lip,
+        ),
+    )
     # Displacement only on damage. Unused film height = -EMBED_DEPTH (inside wall).
     disp_mask = math("MAXIMUM", math("MAXIMUM", crack_body, lip), peel, clamp=True)
     height = math(
@@ -517,7 +603,20 @@ def create_crack_material(
 
     base_mix = node("ShaderNodeMixRGB", blend_type="MIX", use_clamp=True)
     base_mix.name = "CrackAlbedoMix"
-    base_mix.inputs["Color1"].default_value = paint_col
+    paint_tone = node("ShaderNodeMixRGB", blend_type="MIX", use_clamp=True)
+    paint_tone.inputs["Color1"].default_value = paint_col_lo
+    paint_tone.inputs["Color2"].default_value = paint_col
+    links.new(film_mottle.outputs["R"], paint_tone.inputs["Fac"])
+    paint_film = node("ShaderNodeMixRGB", blend_type="MULTIPLY", use_clamp=True)
+    links.new(paint_tone.outputs["Color"], paint_film.inputs["Color1"])
+    paint_film.inputs["Color2"].default_value = tuple(
+        min(1.0, c * 0.82) for c in paint_col[:3]
+    ) + (1.0,)
+    links.new(
+        math("MULTIPLY", film_h, film_albedo_amt, clamp=True),
+        paint_film.inputs["Fac"],
+    )
+    links.new(paint_film.outputs["Color"], base_mix.inputs["Color1"])
     base_mix.inputs["Color2"].default_value = substrate_col
     links.new(peel, base_mix.inputs["Fac"])
     base_col = node("ShaderNodeMixRGB", blend_type="MIX", use_clamp=True)
@@ -526,10 +625,15 @@ def create_crack_material(
     links.new(base_mix.outputs["Color"], base_col.inputs["Color1"])
     links.new(channel, base_col.inputs["Fac"])
 
+    paint_rough_var = math(
+        "ADD",
+        paint_rough,
+        math("MULTIPLY", math("SUBTRACT", film_h, 0.5), 0.16),
+    )
     rough = node("ShaderNodeMapRange", clamp=True)
     rough.inputs["From Min"].default_value = 0.0
     rough.inputs["From Max"].default_value = 1.0
-    rough.inputs["To Min"].default_value = paint_rough
+    links.new(paint_rough_var, rough.inputs["To Min"])
     rough.inputs["To Max"].default_value = substrate_rough
     links.new(exposed, rough.inputs["Value"])
 
@@ -537,16 +641,10 @@ def create_crack_material(
     links.new(base_col.outputs["Color"], bsdf.inputs["Base Color"])
     links.new(rough.outputs["Result"], bsdf.inputs["Roughness"])
 
-    roller_map = node("ShaderNodeMapping", vector_type="POINT")
-    roller_map.inputs["Scale"].default_value[u_idx] = roller_aniso
-    links.new(pattern, roller_map.inputs["Vector"])
-    roller_h = noise(roller_map.outputs["Vector"], roller_freq, 3.0, 0.4)
-    grain_h = noise(pattern, grain_freq, 5.0, 0.55)
-    paint_h = math("ADD", math("MULTIPLY", roller_h, roller_strength), math("MULTIPLY", grain_h, grain_strength))
     paint_bump = node("ShaderNodeBump")
-    paint_bump.inputs["Strength"].default_value = 1.0
-    paint_bump.inputs["Distance"].default_value = 0.0004
-    links.new(paint_h, paint_bump.inputs["Height"])
+    paint_bump.inputs["Strength"].default_value = film_bump_str
+    paint_bump.inputs["Distance"].default_value = film_bump_dist
+    links.new(math("MULTIPLY", film_h, covered), paint_bump.inputs["Height"])
     links.new(paint_bump.outputs["Normal"], bsdf.inputs["Normal"])
 
     # Hard mask tied to displacement mask so alpha and geometry agree.
@@ -585,31 +683,56 @@ def _room_stem(name: str) -> str:
     return name.split(".")[0]
 
 
-def _mean_material_rgb(mat: bpy.types.Material):
-    """Representative albedo from a procedural floor shader (ramps / RGB nodes)."""
-    if mat is None or not getattr(mat, "use_nodes", False) or mat.node_tree is None:
-        return None
-    samples = []
-    for n in mat.node_tree.nodes:
+def _collect_tree_colors(tree, samples, seen):
+    """Recurse a shader tree (node groups included) for albedo-ish colours.
+
+    Tiled shaders keep their tile colour either behind a Mix chain feeding a
+    linked Base Color, or inside a node group - both invisible to a scan that
+    only reads unlinked Base Color sockets on the top level, which is why this
+    used to come back empty for ceramic.tile and TiledWood alike.
+    """
+    if tree is None or tree.as_pointer() in seen:
+        return
+    seen.add(tree.as_pointer())
+    for n in tree.nodes:
         if n.type == "VALTORGB":
             for el in n.color_ramp.elements:
                 samples.append(tuple(el.color[:3]))
         elif n.type == "RGB":
             samples.append(tuple(n.outputs[0].default_value[:3]))
-        elif n.type == "BSDF_PRINCIPLED":
-            sock = n.inputs.get("Base Color")
-            if sock is not None and not sock.is_linked:
-                samples.append(tuple(sock.default_value[:3]))
+        elif n.type == "GROUP":
+            # The group node's own sockets carry what was passed in, e.g.
+            # TiledWood's "Main Color"; the tree behind it only has defaults.
+            _collect_tree_colors(getattr(n, "node_tree", None), samples, seen)
+        for sock in n.inputs:
+            if sock.is_linked or sock.type != "RGBA":
+                continue
+            if n.type == "BSDF_PRINCIPLED" and sock.name != "Base Color":
+                continue
+            r0, g0, b0 = (float(c) for c in sock.default_value[:3])
+            # Blender's own untouched socket defaults, not authored colour.
+            neutral = abs(r0 - g0) < 1e-3 and abs(g0 - b0) < 1e-3
+            if neutral and any(abs(r0 - d) < 1e-3 for d in (0.8, 0.5)):
+                continue
+            samples.append((r0, g0, b0))
+
+
+def _mean_material_rgb(mat: bpy.types.Material):
+    """Representative albedo from a procedural floor shader (ramps / RGB nodes)."""
+    if mat is None or not getattr(mat, "use_nodes", False) or mat.node_tree is None:
+        return None
+    samples = []
+    _collect_tree_colors(mat.node_tree, samples, set())
     if not samples:
         return None
     # Drop mortar/grout blacks and unused whites so wood/tile midtones win.
-    mid = [
-        c
-        for c in samples
-        if 0.06 < (c[0] + c[1] + c[2]) / 3.0 < 0.92
-    ]
-    use = mid or samples
-    return tuple(float(np.mean([c[i] for c in use])) for i in range(3))
+    # With none left there is no albedo to speak of, and falling back to the
+    # raw samples would hand back a near-black average built out of mask
+    # colours; callers treat None as "leave the default alone".
+    mid = [c for c in samples if 0.06 < (c[0] + c[1] + c[2]) / 3.0 < 0.92]
+    if not mid:
+        return None
+    return tuple(float(np.mean([c[i] for c in mid])) for i in range(3))
 
 
 def _cavity_from_host(rgb):

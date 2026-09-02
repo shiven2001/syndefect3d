@@ -625,15 +625,23 @@ def pose_defect_cameras(
             target = shuffled[idx % len(shuffled)]
         target_loc = Vector(target.matrix_world.translation)
 
-        local_normal = Vector((1, 0, 0))
         surface = target.get("syndefect_surface", "wall")
-        if surface == "floor":
-            local_normal = Vector((0, 0, 1))
-        elif surface == "ceiling":
-            local_normal = Vector((0, 0, -1))
-        world_normal = (
-            target.matrix_world.to_3x3() @ local_normal
-        ).normalized()
+        # A defect may record the direction it actually faces. The local-axis
+        # convention below only holds for planes built the wall/floor way, and
+        # a decal seated on an arbitrary face has no reason to obey it.
+        world_normal = None
+        explicit = target.get("syndefect_normal")
+        if explicit is not None and len(explicit) == 3:
+            cand = Vector(tuple(float(c) for c in explicit))
+            if cand.length > 1e-6:
+                world_normal = cand.normalized()
+        if world_normal is None:
+            local_normal = Vector((1, 0, 0))
+            if surface == "floor":
+                local_normal = Vector((0, 0, 1))
+            elif surface == "ceiling":
+                local_normal = Vector((0, 0, -1))
+            world_normal = (target.matrix_world.to_3x3() @ local_normal).normalized()
         if world_normal.length < 1e-6:
             world_normal = Vector((0.0, 0.0, 1.0 if surface == "floor" else -1.0))
 
@@ -681,6 +689,7 @@ def pose_defect_cameras(
 
         cam_rig.location = cam_loc
         cam_rig.rotation_euler = rot_euler
+        cam_rig["syndefect_target"] = target.name
 
         for cam in cam_rig.children:
             if cam.type != "CAMERA":

@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Filled by populate_state_placeholders; consumed by generate_indoors after room_walls
 deferred_wall_bubble_finalize = []
+deferred_ceiling_bubble_finalize = []
 deferred_paint_run_finalize = []
 deferred_paint_patch_finalize = []
 
@@ -84,6 +85,7 @@ def populate_state_placeholders(state: State, filter=None, final=True):
     update_state_mesh_objs = []
     deferred_spalling_plug_objs = []
     deferred_wall_bubble_objs = []
+    deferred_ceiling_bubble_objs = []
     deferred_paint_run_objs = []
     deferred_paint_patch_objs = []
 
@@ -119,6 +121,8 @@ def populate_state_placeholders(state: State, filter=None, final=True):
         # so .wall objects with materials exist.
         elif os.generator.__class__.__name__ == "WallBubblePlaneFactory":
             deferred_wall_bubble_objs.append((os.generator, os.obj))
+        elif os.generator.__class__.__name__ == "CeilingBubbleFactory":
+            deferred_ceiling_bubble_objs.append((os.generator, os.obj))
         elif os.generator.__class__.__name__ == "PaintRunPlaneFactory":
             deferred_paint_run_objs.append((os.generator, os.obj))
         elif os.generator.__class__.__name__ == "PaintPatchPlaneFactory":
@@ -147,8 +151,11 @@ def populate_state_placeholders(state: State, filter=None, final=True):
         generator.finalize_assets([obj])
 
     # WallBubblePlaneFactory finalize runs after room_walls (see generate_indoors)
+    # CeilingBubbleFactory finalize runs after room_ceilings (ceiling paint exists).
     deferred_wall_bubble_finalize.clear()
     deferred_wall_bubble_finalize.extend(deferred_wall_bubble_objs)
+    deferred_ceiling_bubble_finalize.clear()
+    deferred_ceiling_bubble_finalize.extend(deferred_ceiling_bubble_objs)
     deferred_paint_run_finalize.clear()
     deferred_paint_run_finalize.extend(deferred_paint_run_objs)
     deferred_paint_patch_finalize.clear()

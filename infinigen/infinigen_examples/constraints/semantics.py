@@ -16,7 +16,10 @@ from infinigen.assets.paint_peel_plane import (
 # from infinigen.assets.spalling_plane import SpallingPlaneFactory, SpallingPlugPlaneFactory  # commented out
 from infinigen.assets.paint_patch_plane import PaintPatchPlaneFactory
 from infinigen.assets.paint_run_plane import PaintRunPlaneFactory
-from infinigen.assets.wall_bubble_plane import WallBubblePlaneFactory
+from infinigen.assets.wall_bubble_plane import (
+    CeilingBubbleFactory,
+    WallBubblePlaneFactory,
+)
 # from infinigen.assets.weak_leak_stain_plane import WeakLeakStainPlaneFactory  # commented out
 # from infinigen.assets.open_wiring_plane import OpenWiringPlaneFactory  # commented out
 from infinigen.assets.objects import (
@@ -233,6 +236,7 @@ def home_asset_usage():
         # SpallingPlaneFactory,  # commented out
         # SpallingPlugPlaneFactory,  # commented out
         WallBubblePlaneFactory,
+        CeilingBubbleFactory,
         PaintRunPlaneFactory,
         PaintPatchPlaneFactory,
         # WeakLeakStainPlaneFactory,  # commented out
@@ -296,6 +300,7 @@ def home_asset_usage():
         # SpallingPlaneFactory,  # commented out
         # SpallingPlugPlaneFactory,  # commented out
         WallBubblePlaneFactory,
+        CeilingBubbleFactory,
         PaintRunPlaneFactory,
         PaintPatchPlaneFactory,
         # WeakLeakStainPlaneFactory,  # commented out

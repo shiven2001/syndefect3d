@@ -21,6 +21,8 @@ Maps defect materials to classes:
   - 5: OpenWiringMaterial_*
   - 6: PaintRunMaterial_*
   - 7: PaintPatchMaterial_*
+  - 8: CornerChipMaterial_*
+  - 9: TileChipMaterial_*
 
 Outputs (default: segmentation pack only):
   - out_dir/images/<id>.png  (RGB)
@@ -61,6 +63,8 @@ CLASS_PAINT_BUBBLE = 4
 CLASS_EXPOSED_WIRING = 5
 CLASS_PAINT_RUN = 6
 CLASS_PAINT_PATCH = 7
+CLASS_CORNER_CHIP = 8
+CLASS_TILE_CHIP = 9
 
 DEFECT_PREFIXES = {
     "CrackMaterial": CLASS_CRACK,
@@ -72,6 +76,8 @@ DEFECT_PREFIXES = {
     "OpenWiringMaterial": CLASS_EXPOSED_WIRING,
     "PaintRunMaterial": CLASS_PAINT_RUN,
     "PaintPatchMaterial": CLASS_PAINT_PATCH,
+    "CornerChipMaterial": CLASS_CORNER_CHIP,
+    "TileChipMaterial": CLASS_TILE_CHIP,
 }
 
 CLASS_NAMES = {
@@ -83,9 +89,11 @@ CLASS_NAMES = {
     CLASS_EXPOSED_WIRING: "exposed_wiring",
     CLASS_PAINT_RUN: "paint_run",
     CLASS_PAINT_PATCH: "paint_patch",
+    CLASS_CORNER_CHIP: "corner_chip",
+    CLASS_TILE_CHIP: "tile_chip",
 }
 
-NUM_CLASSES = 1 + max(DEFECT_PREFIXES.values())  # background 0 + defects 1..7 -> 8 classes
+NUM_CLASSES = 1 + max(DEFECT_PREFIXES.values())  # background 0 + defects 1..N
 # PNG mask grayscale: class k -> k * step (step=36 for 6 classes). Keeps levels under legacy 85/170/255.
 MASK_GRAY_STEP = max(1, 180 // (NUM_CLASSES - 1))
 
@@ -440,16 +448,12 @@ def write_class_names_legend(output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     legend_path = output_dir / "class_names.txt"
     half = MASK_GRAY_STEP // 2
+    class_lines = "".join(
+        f"{cid} {name}\n" for cid, name in sorted(CLASS_NAMES.items())
+    )
     legend_path.write_text(
-        "0 background\n"
-        "1 crack\n"
-        "2 paint_peel\n"
-        "3 spalling\n"
-        "4 paint_bubble\n"
-        "5 exposed_wiring\n"
-        "6 paint_run\n"
-        "7 paint_patch\n"
-        f"# Mask PNG: gray level = class_id * {MASK_GRAY_STEP} (class 0..{NUM_CLASSES - 1})\n"
+        class_lines
+        + f"# Mask PNG: gray level = class_id * {MASK_GRAY_STEP} (class 0..{NUM_CLASSES - 1})\n"
         f"# Decode: label = ((mask + {half}) // {MASK_GRAY_STEP}).clip(0, {NUM_CLASSES - 1})\n"
         "# Legacy 4-class masks only use {0,85,170,255}: label = (mask // 85).clip(0,3)\n"
         "# 2D bboxes: per-image JSON — one box per defect material pass_index (placed asset);\n"

@@ -41,7 +41,10 @@ from infinigen.assets.paint_peel_plane import (
 # )  # commented out
 from infinigen.assets.paint_patch_plane import PaintPatchPlaneFactory
 from infinigen.assets.paint_run_plane import PaintRunPlaneFactory
-from infinigen.assets.wall_bubble_plane import WallBubblePlaneFactory
+from infinigen.assets.wall_bubble_plane import (
+    CeilingBubbleFactory,
+    WallBubblePlaneFactory,
+)
 # from infinigen.assets.weak_leak_stain_plane import WeakLeakStainPlaneFactory  # commented out
 # from infinigen.assets.open_wiring_plane import OpenWiringPlaneFactory  # commented out
 from infinigen.core.constraints import constraint_language as cl
@@ -513,6 +516,8 @@ def home_furniture_constraints(
     paint_peel_count_max: int = 10,
     paint_peel_ceiling_count_min: int = 1,
     paint_peel_ceiling_count_max: int = 3,
+    bubble_ceiling_count_min: int = 1,
+    bubble_ceiling_count_max: int = 3,
     spalling_count_min: int = 2,
     spalling_count_max: int = 4,
     spalling_plug_count_min: int = 1,
@@ -714,6 +719,7 @@ def home_furniture_constraints(
     # spalling_wall = defects_wall[SpallingPlaneFactory]  # commented out
     # spalling_plug_wall = defects_wall[SpallingPlugPlaneFactory]  # commented out
     wall_bubble_wall = defects_wall[WallBubblePlaneFactory]
+    wall_bubble_ceiling = defects_ceiling[CeilingBubbleFactory]
     paint_run_wall = defects_wall[PaintRunPlaneFactory]
     paint_patch_wall = defects_wall[PaintPatchPlaneFactory]
     # weak_leak_stain_wall = defects_wall[WeakLeakStainPlaneFactory]  # commented out
@@ -930,14 +936,23 @@ def home_furniture_constraints(
         )
     )
 
-    # Wall bubbles: blister-like defects on walls
+    # Paint bubbles: blister-like defects on walls and ceilings
     constraints["wall_bubbles"] = rooms.all(
         lambda r: (
-            wall_bubble_wall.related_to(r).count().in_range(2, 6)  # tune as you like
+            wall_bubble_wall.related_to(r).count().in_range(2, 6)
             * wall_bubble_wall.all(
                 lambda t: (
-                    (vertical_diff(t, r).abs() < 1.5)  # mid-wall vertical band
-                    * (t.distance(cutters) > 0.30)  # avoid windows/doors
+                    (vertical_diff(t, r).abs() < 1.5)
+                    * (t.distance(cutters) > 0.30)
+                )
+            )
+            * wall_bubble_ceiling.related_to(r)
+            .count()
+            .in_range(bubble_ceiling_count_min, bubble_ceiling_count_max)
+            * wall_bubble_ceiling.related_to(r).all(
+                lambda t: (
+                    (t.distance(r, cu.ceilingtags).in_range(0.0, 0.02))
+                    * (t.distance(cutters) > 0.30)
                 )
             )
         )
@@ -1026,6 +1041,14 @@ def home_furniture_constraints(
                     + d.distance(window).hinge(0.25, 10).maximize(weight=1)
                     + cl.angle_alignment_cost(d, r, cu.floortags).minimize(weight=5)
                     + cl.accessibility_cost(d, furniture, dist=1).minimize(weight=5)
+                    + cl.center_stable_surface_dist(d).minimize(weight=1)
+                )
+            )
+            + wall_bubble_ceiling.related_to(r).mean(
+                lambda d: (
+                    d.distance(r, cu.ceilingtags).minimize(weight=10)
+                    + d.distance(wall_bubble_ceiling).maximize(weight=1)
+                    + d.distance(wall_bubble_wall).maximize(weight=0.4)
                     + cl.center_stable_surface_dist(d).minimize(weight=1)
                 )
             )

@@ -1356,22 +1356,55 @@ def _snap_wall_fixture_heights(rooms, claim=1.0, margin=0.03):
             )
 
 
+def _is_ceiling_defect(obj) -> bool:
+    """True for defect planes seated on the ceiling slab.
+
+    Beams are built after the solver, so these can land in the downstand
+    band. They are slid in XY rather than used to carve the beam - carving
+    a hole around a flush film would punch through the beam.
+    """
+    if obj.get("syndefect_surface") == "ceiling":
+        return True
+    n = obj.name or ""
+    return any(
+        tok in n
+        for tok in ("CeilingCrack", "CeilingPeel", "CeilingBubble")
+    )
+
+
+def _follow_defect_cameras(target, dx, dy):
+    """Keep close-up rigs on a defect that just slid off a beam."""
+    tname = target.name
+    for o in bpy.data.objects:
+        if o.get("syndefect_target") != tname:
+            continue
+        o.location.x += dx
+        o.location.y += dy
+
+
 def _nudge_ceiling_fixtures_off_beams(beams, margin=0.05):
-    """Slide ceiling lights and extract fans off downstand beams.
+    """Slide ceiling lights, extract fans and ceiling defects off downstand beams.
 
     Beams are generated after the solver, which only sees the ceiling slab, so
     fittings land in the beam band. Moving the fitting is what a real layout
     does; carving the beam is the fallback for wall-mounted objects.
+
+    Ceiling defects sit in the slab (slightly embedded *up*), so they often
+    miss a Z-overlap test against a beam that hangs *down*. Those use XY
+    footprint only.
     """
     tokens = ("CeilingLight", "ExhaustFan")
     if not beams:
         return
     beam_aabbs = [_world_aabb(b) for b in beams]
     for o in list(bpy.data.objects):
-        if o.type != "MESH" or not any(tok in o.name for tok in tokens):
+        if o.type != "MESH" or not len(o.data.vertices):
             continue
-        if not len(o.data.vertices):
+        is_fitting = any(tok in o.name for tok in tokens)
+        is_defect = _is_ceiling_defect(o)
+        if not is_fitting and not is_defect:
             continue
+        dx_tot = dy_tot = 0.0
         for _ in range(8):
             x0, y0, z0, x1, y1, z1 = _world_aabb(o)
             hit = None
@@ -1381,7 +1414,7 @@ def _nudge_ceiling_fixtures_off_beams(beams, margin=0.05):
                     continue
                 if y1 + margin <= by0 or y0 - margin >= by1:
                     continue
-                if z1 < bz0 or z0 > bz1:
+                if not is_defect and (z1 < bz0 or z0 > bz1):
                     continue
                 hit = b
                 break
@@ -1394,7 +1427,18 @@ def _nudge_ceiling_fixtures_off_beams(beams, margin=0.05):
                 break
             o.location.x += dx
             o.location.y += dy
+            dx_tot += dx
+            dy_tot += dy
             bpy.context.view_layer.update()
+        if abs(dx_tot) + abs(dy_tot) < 1e-6:
+            continue
+        if is_defect:
+            _follow_defect_cameras(o, dx_tot, dy_tot)
+        logger.info(
+            "slid %s %.2f m clear of a ceiling beam",
+            o.name.split("(")[0],
+            (dx_tot * dx_tot + dy_tot * dy_tot) ** 0.5,
+        )
 
 
 # Fixtures that are mounted high enough to foul a downstand beam. Defect planes
@@ -1514,6 +1558,7 @@ WALL_DEFECT_FACTORIES = {
 CEILING_DEFECT_FACTORIES = {
     "CeilingCrackPlaneFactory",
     "CeilingPeelFactory",
+    "CeilingBubbleFactory",
 }
 FLOOR_DEFECT_FACTORIES = {
     "FloorCrackPlaneFactory",
@@ -1600,6 +1645,7 @@ def strip_defects_on_tiled_surfaces(walls, ceilings, state, floors=None):
 
         for attr in (
             "deferred_wall_bubble_finalize",
+            "deferred_ceiling_bubble_finalize",
             "deferred_paint_run_finalize",
             "deferred_paint_patch_finalize",
         ):

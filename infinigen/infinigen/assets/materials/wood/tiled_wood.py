@@ -27,6 +27,7 @@ def nodegroup_tiling(nw: NodeWrangler):
             ("NodeSocketFloat", "Horizontal Scale", 0.5000),
             ("NodeSocketFloat", "Vertical Scale", 0.5),
             ("NodeSocketFloat", "Seed", 0.5000),
+            ("NodeSocketVector", "Location", (0.0, 0.0, 0.0)),
         ],
     )
 
@@ -44,7 +45,9 @@ def nodegroup_tiling(nw: NodeWrangler):
 
     vec = texture_coordinate.outputs["Object"]
 
-    vec = nw.new_node(Nodes.Mapping, [vec, uniform(0, 1, 3)])
+    vec = nw.new_node(
+        Nodes.Mapping, [vec, group_input.outputs["Location"]]
+    )
 
     add = nw.new_node(Nodes.VectorMath, input_kwargs={0: vec, 1: combine_xyz})
 
@@ -111,6 +114,7 @@ def nodegroup_tiled_wood(nw: NodeWrangler):
             ("NodeSocketFloat", "Tile Vertical Scale", 2.9600),
             ("NodeSocketColor", "Main Color", (0.0000, 0.0000, 0.0000, 1.0000)),
             ("NodeSocketFloat", "Seed", 0.0000),
+            ("NodeSocketVector", "Location", (0.0, 0.0, 0.0)),
         ],
     )
 
@@ -120,6 +124,7 @@ def nodegroup_tiled_wood(nw: NodeWrangler):
             "Horizontal Scale": group_input.outputs["Tile Horizontal Scale"],
             "Vertical Scale": group_input.outputs["Tile Vertical Scale"],
             "Seed": group_input.outputs["Seed"],
+            "Location": group_input.outputs["Location"],
         },
     )
 
@@ -296,6 +301,28 @@ def shader_wood_tiled(
     if base_color is None:
         base_color = get_color()
 
+    loc = tuple(uniform(0, 1, 3))
+    from infinigen.assets.materials.ceramic.tile_layout import record_tile_layout
+
+    record_tile_layout(
+        shape="staggered",
+        vertical=False,
+        loc=loc,
+        rot=(0.0, 0.0, 0.0),
+        scale=(1.0, 1.0, 1.0),
+        mortar=0.005,
+        brick_scale=1.0,
+        brick_width=1.0 / float(vscale),
+        row_height=1.0 / float(hscale),
+        offset_amount=0.5,
+        offset_frequency=2,
+        squash_amount=1.0,
+        squash_frequency=1,
+        y_shift=1.0 / float(hscale),
+        kind="wood",
+        base_color=tuple(float(c) for c in base_color[:3]),
+    )
+
     group = nw.new_node(
         nodegroup_tiled_wood().name,
         input_kwargs={
@@ -303,6 +330,7 @@ def shader_wood_tiled(
             "Tile Vertical Scale": vscale,
             "Seed": seed,
             "Main Color": base_color,
+            "Location": loc,
         },
     )
 
@@ -328,7 +356,17 @@ class TiledWood:
     shader = shader_wood_tiled
 
     def generate(self):
-        return surface.shaderfunc_to_material(shader_wood_tiled)
+        from infinigen.assets.materials.ceramic.tile_layout import (
+            dump_layout,
+            take_recorded_layout,
+        )
+
+        mat = surface.shaderfunc_to_material(shader_wood_tiled)
+        layout = take_recorded_layout()
+        if layout:
+            layout["kind"] = "wood"
+            dump_layout(mat, layout)
+        return mat
 
     __call__ = generate
 

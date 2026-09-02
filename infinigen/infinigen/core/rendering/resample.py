@@ -14,7 +14,10 @@ from infinigen.assets.lighting import sky_lighting
 from infinigen.assets.objects import rocks, trees
 from infinigen.assets.paint_patch_plane import refresh_paint_patch_materials
 from infinigen.assets.paint_run_plane import refresh_paint_run_materials
-from infinigen.assets.wall_bubble_plane import refresh_wall_bubble_materials
+from infinigen.assets.wall_bubble_plane import (
+    refresh_ceiling_bubble_materials,
+    refresh_wall_bubble_materials,
+)
 from infinigen.core.nodes.node_info import Nodes
 from infinigen.core.nodes.node_utils import resample_node_group
 from infinigen.core.nodes.node_wrangler import NodeWrangler
@@ -85,6 +88,8 @@ def resample_room_surfaces(scene_seed):
                 list(ceiling_col.objects),
                 material_seed=int_hash((scene_seed, "render_ceilings")),
             )
+        with Timer("Refresh ceiling-bubble materials"):
+            refresh_ceiling_bubble_materials(list(ceiling_col.objects))
 
 
 def resample_scene(scene_seed):

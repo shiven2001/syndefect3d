@@ -23,6 +23,8 @@ from infinigen.assets import lighting
 # Boolean/cutter logic (commented out - not needed):
 # from infinigen.assets.spalling_plane import apply_spalling_plug_boolean_to_walls
 from infinigen.assets.crack_plane import tint_floor_cracks_from_host
+from infinigen.assets.edge_chip_plane import install_edge_chips
+from infinigen.assets.tile_chip_plane import install_tile_chips
 from infinigen.assets.materials.dev import InvisibleToCamera
 from infinigen.assets.objects.wall_decorations.skirting_board import make_skirting_board
 from infinigen.assets.placement.floating_objects import FloatingObjectPlacement
@@ -565,6 +567,21 @@ def compose_indoors(
         prereq="strip_tiled_floor_defects",
         use_chance=False,
     )
+    def place_tile_chips():
+        return install_tile_chips(
+            list(rooms_split["wall"].objects),
+            floors=list(rooms_split["floor"].objects),
+            keep_rooms=visible_rooms,
+            seed=scene_seed,
+        )
+
+    tile_chip_objs = p.run_stage(
+        "tile_chips",
+        place_tile_chips,
+        prereq="strip_tiled_floor_defects",
+        use_chance=False,
+        default=[],
+    )
     p.run_stage(
         "room_ceilings",
         lambda: room_dec.room_ceilings(
@@ -578,6 +595,21 @@ def compose_indoors(
         lambda: room_dec.strip_defects_on_tiled_surfaces(
             [], rooms_split["ceiling"].objects, state
         ),
+        prereq="room_ceilings",
+        use_chance=False,
+    )
+
+    def finalize_ceiling_bubbles():
+        host_by_name = {c.name: c for c in rooms_split["ceiling"].objects}
+        for gen, obj in populate.deferred_ceiling_bubble_finalize:
+            if obj is None:
+                continue
+            gen.finalize_assets([obj], state=state, wall_by_name=host_by_name)
+        populate.deferred_ceiling_bubble_finalize.clear()
+
+    p.run_stage(
+        "paint_ceiling_bubble_materials",
+        finalize_ceiling_bubbles,
         prereq="room_ceilings",
         use_chance=False,
     )
@@ -644,6 +676,112 @@ def compose_indoors(
     # After the beams, so the run has already been shortened to fit under the
     # soffit and the hole is cut at the height the bowl finally sits at.
     p.run_stage("inset_sinks", room_dec.inset_sinks, use_chance=False)
+
+    def place_edge_chips():
+        beams = []
+        pillars = []
+        if "unique_assets:ceiling_beams" in bpy.data.collections:
+            beams = list(bpy.data.collections["unique_assets:ceiling_beams"].objects)
+        if "unique_assets:pillars" in bpy.data.collections:
+            pillars = list(bpy.data.collections["unique_assets:pillars"].objects)
+        return install_edge_chips(
+            list(rooms_split["wall"].objects),
+            beams=beams,
+            pillars=pillars,
+            keep_rooms=visible_rooms,
+            seed=scene_seed,
+        )
+
+    chip_objs = p.run_stage(
+        "edge_chips",
+        place_edge_chips,
+        prereq="room_ceiling_beams",
+        use_chance=False,
+        default=[],
+    )
+
+    def pose_edge_chip_cameras():
+        if not chip_objs:
+            return
+        if not placement.camera.add_defect_focus():
+            return
+        bvh = None
+        if scene_preprocessed:
+            bvh = scene_preprocessed.get("scene_bvh")
+        if bvh is None:
+            logger.warning(
+                "pose_edge_chip_cameras: no scene BVH, skipping extra rigs"
+            )
+            return
+        extra = placement.camera.spawn_camera_rigs(
+            n_camera_rigs=len(chip_objs),
+            start_index=len(camera_rigs),
+        )
+        camera_rigs.extend(extra)
+        placement.camera.pose_defect_cameras(
+            cam_rigs=extra,
+            defect_objs=chip_objs,
+            scene_bvh=bvh,
+            one_to_one=True,
+        )
+        logger.info(
+            "Added %s edge-chip camera rig(s) starting at camrig.%s",
+            len(extra),
+            extra[0].name if extra else "?",
+        )
+
+    p.run_stage(
+        "pose_edge_chip_cameras",
+        pose_edge_chip_cameras,
+        prereq="edge_chips",
+        use_chance=False,
+    )
+
+    def pose_tile_chip_cameras():
+        if not tile_chip_objs:
+            return
+        if not placement.camera.add_defect_focus():
+            return
+        bvh = None
+        if scene_preprocessed:
+            bvh = scene_preprocessed.get("scene_bvh")
+        if bvh is None:
+            logger.warning("pose_tile_chip_cameras: no scene BVH, skipping extra rigs")
+            return
+        targets = list(tile_chip_objs)
+        if len(targets) > 6:
+            rng = np.random.default_rng(int(scene_seed) + 19)
+            pick = rng.choice(len(targets), size=6, replace=False)
+            targets = [targets[i] for i in pick]
+        extra = placement.camera.spawn_camera_rigs(
+            n_camera_rigs=len(targets),
+            start_index=len(camera_rigs),
+        )
+        camera_rigs.extend(extra)
+        # Chips are 8-40 mm across. The shared 1.4 m / 40 mm standpoint puts a
+        # 1 cm chip on ~8 px of a 1024 render, which is why they read as absent
+        # even when seated correctly; a longer lens from a short but still
+        # collision-safe standoff frames one at ~50 px instead.
+        placement.camera.pose_defect_cameras(
+            cam_rigs=extra,
+            defect_objs=targets,
+            scene_bvh=bvh,
+            distance=0.42,
+            focal_length=85,
+            one_to_one=True,
+        )
+        logger.info(
+            "Added %s tile-chip camera rig(s) starting at camrig.%s",
+            len(extra),
+            extra[0].name if extra else "?",
+        )
+
+    p.run_stage(
+        "pose_tile_chip_cameras",
+        pose_tile_chip_cameras,
+        prereq="tile_chips",
+        use_chance=False,
+    )
 
     p.run_stage(
         "hide_other_rooms",

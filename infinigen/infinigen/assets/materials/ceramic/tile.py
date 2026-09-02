@@ -21,6 +21,7 @@ from infinigen.core.util.math import FixedSeed
 from infinigen.core.util.random import log_uniform
 
 from . import ceramic
+from .tile_layout import dump_layout, record_tile_layout, take_recorded_layout
 
 
 def mix_shader(nw, base_shader, offset, rotations, mortar, alternating, selections):
@@ -148,6 +149,27 @@ def shader_square_tile(
     if alternating is None:
         alternating = uniform() < 0.75
     size = log_uniform(0.2, 0.4)
+    loc = tuple(uniform(0, 1, 3))
+    rotation = np.pi / 4 if uniform() < 0.3 else 0
+    rot = (0.0, 0.0, np.pi / 2 * np.random.randint(4) + rotation)
+    map_scale = (float(scale), float(scale), float(scale))
+    mortar_size = uniform(0.005, 0.01)
+    record_tile_layout(
+        shape="square",
+        vertical=bool(vertical),
+        size=size,
+        loc=loc,
+        rot=rot,
+        scale=map_scale,
+        mortar=mortar_size,
+        brick_scale=1.0 / size,
+        brick_width=1.0,
+        row_height=1.0,
+        offset_amount=0.0,
+        offset_frequency=1,
+        squash_amount=1.0,
+        squash_frequency=1,
+    )
     vec = nw.new_node(Nodes.TextureCoord).outputs["Object"]
     normal = nw.new_node(Nodes.ShaderNodeNormalMap).outputs["Normal"]
     if vertical:
@@ -156,15 +178,9 @@ def shader_square_tile(
             nw.separate(vec)[-1],
             0,
         )
-    rotation = np.pi / 4 if uniform() < 0.3 else 0
     vec = nw.new_node(
         Nodes.Mapping,
-        [
-            vec,
-            uniform(0, 1, 3),
-            (0, 0, np.pi / 2 * np.random.randint(4) + rotation),
-            [scale] * 3,
-        ],
+        [vec, loc, rot, list(map_scale)],
     )
     vec = nw.combine(*nw.separate(vec)[:2], 0)
     offset, mortar = map(
@@ -175,7 +191,7 @@ def shader_square_tile(
                 "Scale": 1 / size,
                 "Row Height": 1,
                 "Brick Width": 1,
-                "Mortar Size": uniform(0.005, 0.01),
+                "Mortar Size": mortar_size,
                 "Color2": (0, 0, 0, 1),
             },
             attrs={"offset": 0.0, "offset_frequency": 1},
@@ -197,6 +213,26 @@ def shader_rectangle_tile(
     if alternating is None:
         alternating = uniform() < 0.75
     size = log_uniform(0.2, 0.4)
+    loc = tuple(uniform(0, 1, 3))
+    rot = (0.0, 0.0, np.pi / 2 * np.random.randint(4))
+    map_scale = (float(scale), float(scale * log_uniform(1.3, 2)), float(scale))
+    mortar_size = uniform(0.005, 0.01)
+    record_tile_layout(
+        shape="rectangle",
+        vertical=bool(vertical),
+        size=size,
+        loc=loc,
+        rot=rot,
+        scale=map_scale,
+        mortar=mortar_size,
+        brick_scale=1.0 / size,
+        brick_width=1.0,
+        row_height=1.0,
+        offset_amount=0.0,
+        offset_frequency=1,
+        squash_amount=1.0,
+        squash_frequency=1,
+    )
     vec = nw.new_node(Nodes.TextureCoord).outputs["Object"]
     normal = nw.new_node(Nodes.ShaderNodeNormalMap).outputs["Normal"]
     if vertical:
@@ -207,12 +243,7 @@ def shader_rectangle_tile(
         )
     vec = nw.new_node(
         Nodes.Mapping,
-        [
-            vec,
-            uniform(0, 1, 3),
-            (0, 0, np.pi / 2 * np.random.randint(4)),
-            [scale, scale * log_uniform(1.3, 2), scale],
-        ],
+        [vec, loc, rot, list(map_scale)],
     )
     vec = nw.combine(*nw.separate(vec)[:2], 0)
     offset, mortar = map(
@@ -223,7 +254,7 @@ def shader_rectangle_tile(
                 "Scale": 1 / size,
                 "Row Height": 1,
                 "Brick Width": 1,
-                "Mortar Size": uniform(0.005, 0.01),
+                "Mortar Size": mortar_size,
                 "Color2": (0, 0, 0, 1),
             },
             attrs={"offset": 0.0, "offset_frequency": 1},
@@ -245,6 +276,19 @@ def shader_hexagon_tile(
     if alternating is None:
         alternating = uniform() < 0.6
     size = log_uniform(0.15, 0.3)
+    loc = tuple(uniform(0, 1, 3))
+    rot = (0.0, 0.0, np.pi / 2 * np.random.randint(4))
+    map_scale = (float(scale), float(scale), float(scale))
+    mortar_size = uniform(0.005, 0.01)
+    record_tile_layout(
+        shape="hexagon",
+        vertical=bool(vertical),
+        size=size,
+        loc=loc,
+        rot=rot,
+        scale=map_scale,
+        mortar=mortar_size,
+    )
     vec = nw.new_node(Nodes.TextureCoord).outputs["Object"]
     normal = nw.new_node(Nodes.ShaderNodeNormalMap).outputs["Normal"]
     if vertical:
@@ -255,7 +299,7 @@ def shader_hexagon_tile(
         )
     vec = nw.new_node(
         Nodes.Mapping,
-        [vec, uniform(0, 1, 3), (0, 0, np.pi / 2 * np.random.randint(4)), [scale] * 3],
+        [vec, loc, rot, list(map_scale)],
     )
     qs = []
     for n in (
@@ -301,7 +345,7 @@ def shader_hexagon_tile(
         ),
         nw.scalar_add(diffs[2], diffs[0]),
     )
-    mortar = nw.math("GREATER_THAN", max_dist, 1 - uniform(0.005, 0.01) / size / 2)
+    mortar = nw.math("GREATER_THAN", max_dist, 1 - mortar_size / size / 2)
     rotations = np.pi * 2 / 3 * np.arange(3)
     mix_shader(
         nw,
@@ -329,6 +373,25 @@ def shader_staggered_tile(
     horizontal_scale = scale * log_uniform(2.0, 3.5)
     if vertical_scale is None:
         vertical_scale = horizontal_scale * log_uniform(0.05, 0.2)
+    loc = tuple(uniform(0, 1, 3))
+    mortar_size = uniform(0.005, 0.01)
+    y_shift = 0.5 / horizontal_scale
+    record_tile_layout(
+        shape="staggered",
+        vertical=bool(vertical),
+        loc=loc,
+        rot=(0.0, 0.0, 0.0),
+        scale=(1.0, 1.0, 1.0),
+        mortar=mortar_size,
+        brick_scale=1.0,
+        brick_width=1.0 / float(vertical_scale),
+        row_height=1.0 / float(horizontal_scale),
+        offset_amount=0.5,
+        offset_frequency=2,
+        squash_amount=1.0,
+        squash_frequency=1,
+        y_shift=y_shift,
+    )
 
     vec = nw.new_node(Nodes.TextureCoord).outputs["Object"]
     normal = nw.new_node(Nodes.ShaderNodeNormalMap).outputs["Normal"]
@@ -338,8 +401,8 @@ def shader_staggered_tile(
             nw.separate(vec)[-1],
             0,
         )
-    vec = nw.new_node(Nodes.Mapping, [vec, uniform(0, 1, 3)])
-    vec = nw.add(vec, nw.combine(0, nw.scalar_divide(0.5, horizontal_scale), 0))
+    vec = nw.new_node(Nodes.Mapping, [vec, loc])
+    vec = nw.add(vec, nw.combine(0, y_shift, 0))
 
     offset, mortar = map(
         nw.new_node(
@@ -348,7 +411,7 @@ def shader_staggered_tile(
                 "Vector": vec,
                 "Color2": (0, 0, 0, 1.0000),
                 "Scale": 1.0000,
-                "Mortar Size": uniform(0.005, 0.01),
+                "Mortar Size": mortar_size,
                 "Mortar Smooth": 1.0000,
                 "Bias": -0.5000,
                 "Brick Width": nw.scalar_divide(1, vertical_scale),
@@ -371,6 +434,26 @@ def shader_crossed_tile(
     **kwargs,
 ):
     n = np.random.randint(4, 8)
+    loc = tuple(uniform(0, 1, 3))
+    rot = (0.0, 0.0, np.pi / 2 * np.random.randint(4))
+    map_scale = (float(scale), float(scale), float(scale))
+    mortar_size = uniform(0.005, 0.01)
+    record_tile_layout(
+        shape="crossed",
+        vertical=bool(vertical),
+        loc=loc,
+        rot=rot,
+        scale=map_scale,
+        mortar=mortar_size,
+        brick_scale=1.0,
+        brick_width=1.0,
+        row_height=1.0 / float(n),
+        offset_amount=0.0,
+        offset_frequency=1,
+        squash_amount=1.0,
+        squash_frequency=1,
+        crossed_n=int(n),
+    )
     vec = nw.new_node(Nodes.TextureCoord).outputs["Object"]
     normal = nw.new_node(Nodes.ShaderNodeNormalMap).outputs["Normal"]
     if vertical:
@@ -381,7 +464,7 @@ def shader_crossed_tile(
         )
     vec = nw.new_node(
         Nodes.Mapping,
-        [vec, uniform(0, 1, 3), (0, 0, np.pi / 2 * np.random.randint(4)), [scale] * 3],
+        [vec, loc, rot, list(map_scale)],
     )
     x, y, z = nw.separate(vec)
     x_ = nw.scalar_sub(
@@ -395,7 +478,7 @@ def shader_crossed_tile(
                 "Vector": vec,
                 "Color2": (0, 0, 0, 1.0000),
                 "Scale": 1.0000,
-                "Mortar Size": uniform(0.005, 0.01),
+                "Mortar Size": mortar_size,
                 "Brick Width": 1,
                 "Row Height": 1 / n,
             },
@@ -421,7 +504,7 @@ def shader_crossed_tile(
                 "Vector": vec_,
                 "Color2": (0, 0, 0, 1.0000),
                 "Scale": 1.0000,
-                "Mortar Size": uniform(0.005, 0.01),
+                "Mortar Size": mortar_size,
                 "Brick Width": 1,
                 "Row Height": 1 / n,
             },
@@ -458,6 +541,28 @@ def shader_composite_tile(
     if alternating is None:
         alternating = uniform() < 0.75
     size = log_uniform(0.2, 0.4)
+    loc = tuple(uniform(0, 1, 3))
+    rot = (0.0, 0.0, np.pi / 2 * np.random.randint(8))
+    map_scale = (float(scale), float(scale), float(scale))
+    mortar_size = uniform(0.002, 0.005)
+    stride = np.random.randint(4, 7)
+    record_tile_layout(
+        shape="composite",
+        vertical=bool(vertical),
+        size=size,
+        loc=loc,
+        rot=rot,
+        scale=map_scale,
+        mortar=mortar_size,
+        brick_scale=1.0,
+        brick_width=float(size) / float(stride),
+        row_height=1000.0,
+        offset_amount=0.0,
+        offset_frequency=1,
+        squash_amount=1.0,
+        squash_frequency=1,
+        composite_stride=int(stride),
+    )
     vec = nw.new_node(Nodes.TextureCoord).outputs["Object"]
     normal = nw.new_node(Nodes.ShaderNodeNormalMap).outputs["Normal"]
     if vertical:
@@ -468,7 +573,7 @@ def shader_composite_tile(
         )
     vec = nw.new_node(
         Nodes.Mapping,
-        [vec, uniform(0, 1, 3), (0, 0, np.pi / 2 * np.random.randint(8)), [scale] * 3],
+        [vec, loc, rot, list(map_scale)],
     )
     vec = nw.combine(*nw.separate(vec)[:2], 0)
 
@@ -479,8 +584,6 @@ def shader_composite_tile(
     ]
     rotations = np.pi / 2 * np.arange(2)
 
-    mortar_size = uniform(0.002, 0.005)
-    stride = np.random.randint(4, 7)
     offset_h, mortar_h = map(
         nw.new_node(
             Nodes.BrickTexture,
@@ -588,7 +691,7 @@ class Tile:
                         shader_composite_tile,
                     ]
                 )
-        return surface.shaderfunc_to_material(
+        mat = surface.shaderfunc_to_material(
             method,
             base_shader=shader_func,
             alternating=alternating,
@@ -596,6 +699,13 @@ class Tile:
             vertical=vertical,
             name=f"{name}_{method.__name__}_tile",
         )
+        layout = take_recorded_layout()
+        if layout:
+            layout["kind"] = (
+                "wood" if "wood" in str(name).lower() else "ceramic"
+            )
+            dump_layout(mat, layout)
+        return mat
 
     __call__ = generate
 
