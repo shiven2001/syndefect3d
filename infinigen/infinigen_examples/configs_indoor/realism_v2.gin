@@ -161,3 +161,17 @@ apply_surface_imperfections.scale = 6.0
 # Skips defect shaders (the signal) and glass (would frost the windows).
 apply_surface_imperfections.skip_defects = True
 apply_surface_imperfections.skip_transmissive = True
+
+# --- Furniture material realism (render-time) ---
+# An audit of a solved in-use scene found 274/380 furniture materials with
+# nothing driving Normal (98% of furniture surface area) and 54 over-saturated
+# (31% of area, wood shaders up to 0.79 where real timber is ~0.25-0.45).
+# Walls/ceilings/floors have their own shaders and are unaffected.
+apply_furniture_material_realism.enabled = True
+apply_furniture_material_realism.micro_normal = True
+apply_furniture_material_realism.desaturate = True
+apply_furniture_material_realism.max_saturation = 0.45
+apply_furniture_material_realism.bump_strength = 0.15
+apply_furniture_material_realism.bump_scale = 220.0
+apply_furniture_material_realism.bump_distance = 0.0006
+apply_furniture_material_realism.skip_defects = True

@@ -22,6 +22,7 @@ import math
 
 import bpy
 import gin
+import numpy as np
 
 from infinigen.core.nodes import node_utils
 from infinigen.core.nodes.node_info import Nodes
@@ -32,6 +33,15 @@ logger = logging.getLogger(__name__)
 
 BEVEL_MODIFIER_NAME = "SynDefectEdgeBevel"
 IMPERFECTION_GROUP_NAME = "SynDefectSurfaceImperfection"
+MICRONORMAL_GROUP_NAME = "SynDefectMicroNormal"
+
+# Materials that must never receive a bump chain: a normal perturbation on
+# glass frosts it, on a mirror it destroys the reflection, and on an emitter
+# it does nothing but cost samples.
+NO_BUMP_TOKENS = (
+    "glass", "mirror", "emission", "light", "lamp", "screen", "display",
+    "water", "chrome",
+)
 
 # Mirrors the prefix -> class map in tools/prepare_defect_annotated_dataset.py.
 # Defect planes carry the annotation signal: their geometry must not move and
@@ -225,6 +235,216 @@ def _insert_imperfection(material, node, group, *, strength, scale, seed):
     )
     material.node_tree.links.new(group_node.outputs["Roughness"], sock)
     return True
+
+
+@node_utils.to_nodegroup(MICRONORMAL_GROUP_NAME, singleton=True, type="ShaderNodeTree")
+def nodegroup_micro_normal(nw: NodeWrangler):
+    """Fine surface relief for assets that ship with a flat Normal input.
+
+    An audit of a solved in-use scene found 274 of 380 furniture materials -
+    98% of furniture surface area - with nothing driving Normal at all. Flat
+    albedo under flat shading is the loudest CGI tell there is, and it is the
+    same failure the defect assets had: everything painted, nothing in relief.
+
+    Two octaves in OBJECT coordinates so the grain is fixed to the asset and
+    does not swim between the room camera and its close-up rig: a broad weave
+    or grain direction, plus fine tooth on top.
+    """
+    group_input = nw.new_node(
+        Nodes.GroupInput,
+        expose_input=[
+            ("NodeSocketFloat", "Scale", 220.0000),
+            ("NodeSocketFloat", "Strength", 0.1500),
+            ("NodeSocketFloat", "Distance", 0.0006),
+            ("NodeSocketFloat", "Seed", 0.0000),
+        ],
+    )
+    tex = nw.new_node(Nodes.TextureCoord)
+    scale = group_input.outputs["Scale"]
+
+    coarse = nw.new_node(
+        Nodes.NoiseTexture,
+        input_kwargs={
+            "Vector": tex.outputs["Object"],
+            "W": group_input.outputs["Seed"],
+            "Scale": scale,
+            "Detail": 6.0000,
+            "Roughness": 0.6000,
+        },
+        attrs={"noise_dimensions": "4D"},
+    )
+    fine = nw.new_node(
+        Nodes.NoiseTexture,
+        input_kwargs={
+            "Vector": tex.outputs["Object"],
+            "W": group_input.outputs["Seed"],
+            "Scale": nw.scalar_multiply(scale, 5.0000),
+            "Detail": 8.0000,
+            "Roughness": 0.7500,
+        },
+        attrs={"noise_dimensions": "4D"},
+    )
+    height = nw.scalar_add(
+        nw.scalar_multiply(coarse.outputs["Fac"], 0.6500),
+        nw.scalar_multiply(fine.outputs["Fac"], 0.3500),
+    )
+    # strict=False: infinigen bans Bump in favour of true Displacement, but
+    # true displacement needs adaptive subdivision (not enabled in this repo -
+    # displacement_method="BOTH" measurably does nothing here) and would be
+    # ruinous across every furniture surface. Sub-millimetre grain is exactly
+    # what bump is for.
+    bump = nw.new_node(
+        Nodes.Bump,
+        input_kwargs={
+            "Strength": group_input.outputs["Strength"],
+            "Distance": group_input.outputs["Distance"],
+            "Height": height,
+        },
+        strict=False,
+    )
+    nw.new_node(
+        Nodes.GroupOutput,
+        input_kwargs={"Normal": bump.outputs["Normal"]},
+        attrs={"is_active_output": True},
+    )
+
+
+def _skip_for_bump(mat, node, max_transmission: float) -> bool:
+    name = (mat.name or "").lower()
+    if any(tok in name for tok in NO_BUMP_TOKENS):
+        return True
+    if _is_transmissive(node, max_transmission):
+        return True
+    for n in mat.node_tree.nodes:
+        if n.bl_idname in (Nodes.GlassBSDF, Nodes.Emission, Nodes.TranslucentBSDF):
+            return True
+    return False
+
+
+def _desaturate(mat, node, max_sat: float) -> bool:
+    """Pull an over-saturated base colour back toward plausible timber/fabric.
+
+    The audit found 54 materials at saturation > 0.5 over 31% of furniture
+    area, wood shaders as high as 0.79; real timber sits nearer 0.25-0.45.
+
+    A procedural colour cannot be evaluated at build time, so the Hue/Saturation
+    node's multiplier is derived from the material's *measured* mean saturation
+    (`_mean_material_rgb` over the whole tree): mult = max_sat / measured. A
+    fixed multiplier would barely touch a 0.79 shader while over-flattening a
+    0.5 one. An unlinked colour is clamped in place instead.
+    """
+    import colorsys
+
+    # Local import: core/ should not depend on assets/ at module scope.
+    from infinigen.assets.crack_plane import _mean_material_rgb
+
+    sock = node.inputs.get("Base Color")
+    if sock is None:
+        return False
+
+    if not sock.links:
+        r, g, b, a = sock.default_value
+        h, sv, v = colorsys.rgb_to_hsv(*[min(max(c, 0.0), 1.0) for c in (r, g, b)])
+        if sv <= max_sat:
+            return False
+        r2, g2, b2 = colorsys.hsv_to_rgb(h, max_sat, v)
+        sock.default_value = (r2, g2, b2, a)
+        return True
+
+    src = sock.links[0].from_socket
+    if src.node.bl_idname == "ShaderNodeHueSaturation":
+        return False  # already spliced by an earlier run
+
+    rgb = _mean_material_rgb(mat)
+    if rgb is None:
+        return False
+    _h, measured, _v = colorsys.rgb_to_hsv(*[min(max(c, 0.0), 1.0) for c in rgb])
+    if measured <= max_sat:
+        return False
+    mult = float(np.clip(max_sat / max(measured, 1e-6), 0.05, 1.0))
+
+    nw = NodeWrangler(mat.node_tree)
+    hsv = nw.new_node(
+        "ShaderNodeHueSaturation",
+        input_kwargs={"Saturation": mult, "Color": src},
+    )
+    mat.node_tree.links.new(hsv.outputs["Color"], sock)
+    return True
+
+
+def _insert_micro_normal(mat, node, group, *, strength, scale, distance, seed) -> bool:
+    sock = node.inputs.get("Normal")
+    if sock is None or sock.links:
+        return False  # already has a normal map / bump; leave the author's work
+    nw = NodeWrangler(mat.node_tree)
+    gn = nw.new_node(
+        group.name,
+        input_kwargs={
+            "Scale": float(scale),
+            "Strength": float(strength),
+            "Distance": float(distance),
+            "Seed": float(seed),
+        },
+    )
+    mat.node_tree.links.new(gn.outputs["Normal"], sock)
+    return True
+
+
+@gin.configurable
+def apply_furniture_material_realism(
+    enabled=False,
+    micro_normal=True,
+    desaturate=True,
+    max_saturation=0.45,
+    bump_strength=0.15,
+    bump_scale=220.0,
+    bump_distance=0.0006,
+    seed=0.0,
+    skip_defects=True,
+    max_transmission=0.05,
+):
+    """Give furniture shaders surface relief and sane saturation.
+
+    Walls, ceilings and floors are handled by their own shaders; this targets
+    what the in-use configs add on top - beds, cabinets, shelving, upholstery -
+    where the audit showed 98% of surface area with no Normal input and a third
+    of it over-saturated. Runs at render time like the other passes here, so it
+    also applies to blends solved before it existed, and is a no-op by default.
+
+    Defect materials are skipped: they carry the annotation signal.
+    """
+    if not enabled:
+        return
+
+    group = nodegroup_micro_normal() if micro_normal else None
+    n_norm = n_sat = n_skip = 0
+    for mat in bpy.data.materials:
+        if mat is None or mat.node_tree is None or mat.users == 0:
+            continue
+        if skip_defects and is_defect_material(mat):
+            continue
+        for node in list(mat.node_tree.nodes):
+            if node.bl_idname != Nodes.PrincipledBSDF:
+                continue
+            if _skip_for_bump(mat, node, float(max_transmission)):
+                n_skip += 1
+                continue
+            if desaturate:
+                n_sat += int(_desaturate(mat, node, float(max_saturation)))
+            if micro_normal:
+                mat_seed = float(seed) + (int_hash(mat.name) % 997) * 0.1
+                n_norm += int(
+                    _insert_micro_normal(
+                        mat, node, group,
+                        strength=bump_strength, scale=bump_scale,
+                        distance=bump_distance, seed=mat_seed,
+                    )
+                )
+
+    logger.info(
+        "furniture realism: micro-normal on %s materials, desaturated %s, skipped %s",
+        n_norm, n_sat, n_skip,
+    )
 
 
 @gin.configurable

@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "blender": {
+      "command": "/home/shiven/.local/bin/uvx",
+      "args": [
+        "--python",
+        "3.11",
+        "blender-mcp"
+      ],
+      "env": {
+        "UV_PYTHON_PREFERENCE": "only-managed",
+        "BLENDER_HOST": "localhost",
+        "BLENDER_PORT": "9876",
+        "DISABLE_TELEMETRY": "true"
+      }
+    }
+  }
+}
