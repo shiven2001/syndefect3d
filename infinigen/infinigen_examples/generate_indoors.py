@@ -303,14 +303,23 @@ def compose_indoors(
     )
 
     nonroom_objs = [
-        o.obj for o in state.objs.values() if t.Semantics.Room not in o.tags
+        o.obj
+        for o in state.objs.values()
+        if t.Semantics.Room not in o.tags and o.obj is not None
     ]
     room_objs = [o.obj for o in state.objs.values() if t.Semantics.Room in o.tags]
-    scene_objs = solved_rooms + nonroom_objs
-
     defect_objs = [
-        o.obj for o in state.objs.values()
-        if t.Semantics.Defects in o.tags
+        o.obj
+        for o in state.objs.values()
+        if t.Semantics.Defects in o.tags and o.obj is not None
+    ]
+    # Camera BVH is walls/floors only. Populated furniture (sofas, chairs) is
+    # millions of verts; duplicating+joining it OOMs apartment scenes. Occupancy
+    # still uses the placeholder KD-tree.
+    scene_objs = [
+        o.obj
+        for o in state.objs.values()
+        if t.Semantics.Room in o.tags and o.obj is not None
     ]
 
     n_total = len(camera_rigs)
@@ -319,16 +328,23 @@ def compose_indoors(
     native_rigs = camera_rigs[:n_native]
     defect_rigs_split = camera_rigs[n_native:]
 
+    defect_focus_enabled, defect_focus_max_rigs = placement.camera.add_defect_focus()
+    defect_focus_targets = []
     n_rigs_before_defect_extras = len(camera_rigs)
-    if placement.camera.add_defect_focus() and defect_objs:
+    if defect_focus_enabled and defect_objs:
+        defect_focus_targets = placement.camera.sample_focus_targets(
+            defect_objs, scene_seed, defect_focus_max_rigs
+        )
         extra = placement.camera.spawn_camera_rigs(
-            n_camera_rigs=len(defect_objs),
+            n_camera_rigs=len(defect_focus_targets),
             start_index=len(camera_rigs),
         )
         camera_rigs = list(camera_rigs) + extra
         logger.info(
-            "Added %s defect-focus camera rig(s) (camrig.%s..camrig.%s)",
+            "Added %s defect-focus camera rig(s) of %s defects "
+            "(camrig.%s..camrig.%s)",
             len(extra),
+            len(defect_objs),
             n_rigs_before_defect_extras,
             len(camera_rigs) - 1,
         )
@@ -371,10 +387,10 @@ def compose_indoors(
             )
 
         extra_defect_rigs = camera_rigs[n_rigs_before_defect_extras:]
-        if extra_defect_rigs and defect_objs:
+        if extra_defect_rigs and defect_focus_targets:
             placement.camera.pose_defect_cameras(
                 cam_rigs=extra_defect_rigs,
-                defect_objs=defect_objs,
+                defect_objs=defect_focus_targets,
                 scene_bvh=scene_preprocessed["scene_bvh"],
                 one_to_one=True,
             )
@@ -703,7 +719,8 @@ def compose_indoors(
     def pose_edge_chip_cameras():
         if not chip_objs:
             return
-        if not placement.camera.add_defect_focus():
+        focus_enabled, _ = placement.camera.add_defect_focus()
+        if not focus_enabled:
             return
         bvh = None
         if scene_preprocessed:
@@ -713,14 +730,15 @@ def compose_indoors(
                 "pose_edge_chip_cameras: no scene BVH, skipping extra rigs"
             )
             return
+        targets = placement.camera.sample_focus_targets(chip_objs, scene_seed, 6)
         extra = placement.camera.spawn_camera_rigs(
-            n_camera_rigs=len(chip_objs),
+            n_camera_rigs=len(targets),
             start_index=len(camera_rigs),
         )
         camera_rigs.extend(extra)
         placement.camera.pose_defect_cameras(
             cam_rigs=extra,
-            defect_objs=chip_objs,
+            defect_objs=targets,
             scene_bvh=bvh,
             one_to_one=True,
         )
@@ -740,7 +758,8 @@ def compose_indoors(
     def pose_tile_chip_cameras():
         if not tile_chip_objs:
             return
-        if not placement.camera.add_defect_focus():
+        focus_enabled, _ = placement.camera.add_defect_focus()
+        if not focus_enabled:
             return
         bvh = None
         if scene_preprocessed:

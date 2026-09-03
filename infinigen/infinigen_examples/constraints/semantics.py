@@ -3,7 +3,6 @@
 
 # Authors: Alexander Raistrick
 
-import infinigen.assets.static_assets as static_assets
 from infinigen.assets.crack_plane import (
     CeilingCrackPlaneFactory,
     CrackPlaneFactory,
@@ -139,7 +138,6 @@ def home_asset_usage():
         shelves.SimpleBookcaseFactory,
         shelves.CellShelfFactory,
         shelves.LargeShelfFactory,
-        # static_assets.StaticShelfFactory,
         shelves.KitchenCabinetFactory,
         shelves.SingleCabinetFactory,
     }
@@ -156,7 +154,6 @@ def home_asset_usage():
             tables.TableCocktailFactory,
             shelves.SimpleDeskFactory,
             tables.CoffeeTableFactory,
-            # static_assets.StaticTableFactory,
         },
     )
 
@@ -168,7 +165,6 @@ def home_asset_usage():
 
     used_as[Semantics.LoungeSeating] = {
         seating.SofaFactory,
-        static_assets.StaticSofaFactory,
         seating.ArmChairFactory,
     }
 
@@ -207,7 +203,6 @@ def home_asset_usage():
             bathroom.ShowerStallFactory,
             bathroom.VanityCabinetFactory,
             seating.SofaFactory,
-            static_assets.StaticSofaFactory,
             shelves.TVStandFactory,
         },
     )
@@ -345,7 +340,6 @@ def home_asset_usage():
         shelves.SingleCabinetFactory,
         shelves.KitchenCabinetFactory,
         shelves.LargeShelfFactory,
-        static_assets.StaticShelfFactory,
         table_decorations.SinkFactory,
         tables.TableCocktailFactory,
     }

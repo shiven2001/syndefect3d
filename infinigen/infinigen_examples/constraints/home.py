@@ -24,7 +24,6 @@ from infinigen.assets.objects import (
     wall_decorations,
 )
 
-from infinigen.assets import static_assets
 from infinigen.assets.crack_plane import (
     CeilingCrackPlaneFactory,
     CrackPlaneFactory,
@@ -1691,8 +1690,7 @@ def home_furniture_constraints(
     # region LIVINGROOMS
 
     livingrooms = rooms[Semantics.LivingRoom].excludes(cu.room_types)
-    # sofas = furniture[seating.SofaFactory]
-    sofas = furniture[static_assets.StaticSofaFactory]
+    sofas = furniture[seating.SofaFactory]
     tvstands = wallfurn[shelves.TVStandFactory]
     coffeetables = furniture[tables.CoffeeTableFactory]
 

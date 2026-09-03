@@ -6,17 +6,31 @@
 
 import os
 import random
+from pathlib import Path
 
 import bpy
 import numpy as np
 from mathutils import Vector
 
+from infinigen import repo_root
 from infinigen.assets.objects.wall_decorations.split_ac import SplitACFactory
 from infinigen.assets.objects.wall_decorations.wall_faucet import WallFaucetFactory
 from infinigen.assets.objects.wall_decorations.wall_plug import WallPlugFactory
 from infinigen.assets.static_assets.base import StaticAssetFactory
 from infinigen.core.tagging import tag_support_surfaces
 from infinigen.core.util.math import FixedSeed, int_hash
+
+
+def _resolve_asset_dir(path_to_assets: str) -> Path:
+    candidates = [
+        Path(path_to_assets),
+        repo_root() / path_to_assets,
+        Path(__file__).resolve().parent / "source" / Path(path_to_assets).name,
+    ]
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return Path(path_to_assets)
 
 
 def static_category_factory(
@@ -40,17 +54,25 @@ def static_category_factory(
             with FixedSeed(factory_seed):
                 self.path_to_assets = path_to_assets
                 self.tag_support = tag_support
-                self.asset_dir = path_to_assets
+                self.asset_dir = str(_resolve_asset_dir(path_to_assets))
                 self.x_dim, self.y_dim, self.z_dim = x_dim, y_dim, z_dim
                 self.rotation_euler = rotation_euler
+                if not os.path.isdir(self.asset_dir):
+                    raise FileNotFoundError(
+                        f"Static asset folder missing: {self.asset_dir}. "
+                        "Drop .glb/.obj files there (docs/StaticAssets.md) "
+                        "or switch home.py back to the procedural factory."
+                    )
                 # Cache the list of available asset files
                 self.asset_files = [
                     f
                     for f in os.listdir(self.asset_dir)
                     if f.lower().endswith(tuple(self.import_map.keys()))
                 ]
-                if not self.asset_files or len(self.asset_files) == 0:
-                    raise ValueError(f"No valid asset files found in {self.asset_dir}")
+                if not self.asset_files:
+                    raise FileNotFoundError(
+                        f"No importable meshes in {self.asset_dir}."
+                    )
 
         def create_asset(self, i=None, **params) -> bpy.types.Object:
             # Select a random asset for this spawn using the spawn index i
@@ -207,7 +229,9 @@ def static_category_factory(
     return StaticCategoryFactory
 
 
-# Create factory instances for different categories
+# Optional mesh importers (docs/StaticAssets.md). This repo does not ship
+# source/{Sofa,Table,Shelf} meshes; in-use constraints use procedural factories.
+# AC / plugs / faucets are procedural.
 StaticSofaFactory = static_category_factory(
     "infinigen/assets/static_assets/source/Sofa"
 )
@@ -220,7 +244,6 @@ StaticShelfFactory = static_category_factory(
 StaticDefectPlaneFactory = static_category_factory(
     "infinigen/assets/static_assets/source/DefectPlane", z_dim=1
 )
-# Procedural replacements for the old mesh importers under source/AC, Plugs, Faucets.
 StaticACFactory = SplitACFactory
 StaticWallPlugFactory = WallPlugFactory
 StaticFaucetFactory = WallFaucetFactory

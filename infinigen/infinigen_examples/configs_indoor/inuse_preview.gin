@@ -1,0 +1,43 @@
+# Fast look-see for an occupied apartment. Not the dataset config.
+#
+#   python -m infinigen_examples.generate_indoors --task coarse --seed 0 \
+#     --output_folder outputs/inuse/preview \
+#     -g inuse_preview.gin
+#
+# List this file last. For the real dataset, use inuse.gin instead.
+
+include 'infinigen_examples/configs_indoor/inuse.gin'
+
+# One floor. 2–3 storeys multiply greedy stages (one 200-step solve per room).
+RoomConstants.n_stories = 1
+
+# Cheap floor plan. Bathrooms may come out oversized; fine for a preview.
+FloorPlanSolver.n_divide_trials = 25
+FloorPlanSolver.iters_mult = 25
+
+# inuse.gin listed after fast_solve.gin overwrites those cheaper steps.
+# Medium is per-room: 15 rooms × 200 steps × ~10 s is hours by itself.
+compose_indoors.solve_steps_large = 40
+compose_indoors.solve_steps_medium = 25
+compose_indoors.solve_steps_small = 5
+compose_indoors.solve_small_enabled = False
+compose_indoors.floating_objs_enabled = False
+
+# Island proposals that never fit burn ~30 s a step.
+home_furniture_constraints.kitchen_island_enabled = False
+
+# Fewer unique defect shaders (the 12 h run had ~18k materials).
+home_furniture_constraints.crack_count_min = 1
+home_furniture_constraints.crack_count_max = 2
+home_furniture_constraints.crack_ceiling_count_min = 0
+home_furniture_constraints.crack_ceiling_count_max = 1
+home_furniture_constraints.crack_floor_count_min = 0
+home_furniture_constraints.crack_floor_count_max = 1
+home_furniture_constraints.paint_peel_count_min = 1
+home_furniture_constraints.paint_peel_count_max = 2
+home_furniture_constraints.paint_peel_ceiling_count_min = 0
+home_furniture_constraints.paint_peel_ceiling_count_max = 1
+home_furniture_constraints.bubble_ceiling_count_min = 0
+home_furniture_constraints.bubble_ceiling_count_max = 1
+
+camera.add_defect_focus.max_rigs = 8

@@ -8,6 +8,9 @@
 #     --output_folder outputs/inuse/coarse \
 #     -g fast_solve.gin inuse.gin
 #
+# This file listed last wins over fast_solve.gin (including the 300/200/50
+# solve steps). For a look-see, use inuse_preview.gin instead.
+#
 # List this file last. Do not combine with *_minimal.gin: those strip furniture
 # and pin a single room.
 

@@ -201,9 +201,47 @@ def spawn_camera_rigs(
 
 
 @gin.configurable
-def add_defect_focus(enabled: bool = False):
-    """If True, spawn one extra camera rig per defect after the main batch (see generate_indoors)."""
-    return enabled
+def add_defect_focus(enabled: bool = False, max_rigs: int = 24):
+    """If True, spawn extra close-up camera rigs for defects after the main batch.
+
+    Apartment scenes place 100+ defects. One stereo rig per defect, then
+    duplicating those dense grids into the camera BVH, OOMs the coarse stage.
+    ``max_rigs`` caps extras; sampling is stratified by kind. ``max_rigs < 0``
+    means unlimited.
+    """
+    return enabled, max_rigs
+
+
+def sample_focus_targets(objs, seed: int, max_n: int):
+    """Pick up to ``max_n`` objects, round-robin across ``syndefect_kind`` / factory."""
+    objs = [o for o in objs if o is not None]
+    if max_n is None or max_n < 0 or len(objs) <= max_n:
+        return objs
+    rng = np.random.default_rng(int(seed) + 17)
+
+    def bucket_key(obj):
+        kind = obj.get("syndefect_kind") if hasattr(obj, "get") else None
+        if kind:
+            return str(kind)
+        return (obj.name or "defect").split("(")[0]
+
+    buckets: dict[str, list] = {}
+    for obj in objs:
+        buckets.setdefault(bucket_key(obj), []).append(obj)
+    for group in buckets.values():
+        rng.shuffle(group)
+    keys = list(buckets)
+    rng.shuffle(keys)
+    picked = []
+    while keys and len(picked) < max_n:
+        still = []
+        for key in keys:
+            if buckets[key] and len(picked) < max_n:
+                picked.append(buckets[key].pop())
+            if buckets[key]:
+                still.append(key)
+        keys = still
+    return picked
 
 
 def get_camera_rigs() -> list[bpy.types.Object]:
@@ -703,31 +741,91 @@ def pose_defect_cameras(
         )
 
 
-def build_bvh_and_attrs(objs, tags_queries):
-    dup_objs = []
+def _meshes_for_bvh(objs):
+    meshes = []
     for obj in objs:
-        with SelectObjects(obj):
-            bpy.ops.object.duplicate(linked=0, mode="TRANSLATION")
-            dup_objs.append(bpy.context.view_layer.objects.active)
-    for obj in dup_objs:
-        with butil.ViewportMode(obj, "EDIT"):
-            bpy.ops.mesh.select_all(action="SELECT")
-            bpy.ops.mesh.quads_convert_to_tris(
-                quad_method="BEAUTY", ngon_method="BEAUTY"
-            )
-    with SelectObjects(dup_objs[0]):
-        for obj in dup_objs[1:]:
-            obj.select_set(True)
-        bpy.ops.object.join()
-        obj = bpy.context.view_layer.objects.active
+        if obj is None:
+            continue
+        if getattr(obj, "type", None) != "MESH":
+            continue
+        data = getattr(obj, "data", None)
+        if data is None or not getattr(data, "vertices", None):
+            continue
+        if len(data.vertices) == 0:
+            continue
+        meshes.append(obj)
+    return meshes
 
-    bvh = BVHTree.FromObject(obj, bpy.context.evaluated_depsgraph_get())
-    from infinigen.terrain.utils import Mesh
 
-    with butil.ViewportMode(obj, "EDIT"):
-        bpy.ops.mesh.quads_convert_to_tris(quad_method="BEAUTY", ngon_method="BEAUTY")
-    mesh = Mesh(obj=obj)
-    delete(obj)
+_BOX_TRIS = (
+    (0, 1, 2),
+    (0, 2, 3),
+    (4, 7, 6),
+    (4, 6, 5),
+    (0, 4, 5),
+    (0, 5, 1),
+    (3, 2, 6),
+    (3, 6, 7),
+    (0, 3, 7),
+    (0, 7, 4),
+    (1, 5, 6),
+    (1, 6, 2),
+)
+
+
+def _bbox_tris_world(obj):
+    verts = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
+    return verts, _BOX_TRIS
+
+
+def _loop_tris_world(obj):
+    mesh = obj.data
+    mesh.calc_loop_triangles()
+    mw = obj.matrix_world
+    verts = [mw @ v.co for v in mesh.vertices]
+    faces = [tuple(tri.vertices) for tri in mesh.loop_triangles]
+    return verts, faces
+
+
+@gin.configurable
+def build_bvh_and_attrs(objs, tags_queries, max_full_verts: int = 120000):
+    """Raycast BVH without duplicating the scene in Blender.
+
+    The old path duplicated every mesh, BEAUTY-triangulated, and joined. That
+    OOMs furnished apartments (~10M verts). Indoor posing only needs walls and
+    floors; face-tag answers are unused when tags_queries is empty.
+    """
+    objs = _meshes_for_bvh(objs)
+    if not objs:
+        raise ValueError("build_bvh_and_attrs: no mesh objects to join")
+
+    all_verts = []
+    all_faces = []
+    n_full = n_box = 0
+    for obj in objs:
+        n_verts = len(obj.data.vertices)
+        if n_verts > max_full_verts:
+            verts, faces = _bbox_tris_world(obj)
+            n_box += 1
+        else:
+            verts, faces = _loop_tris_world(obj)
+            if not faces:
+                verts, faces = _bbox_tris_world(obj)
+                n_box += 1
+            else:
+                n_full += 1
+        off = len(all_verts)
+        all_verts.extend(verts)
+        all_faces.extend(tuple(i + off for i in face) for face in faces)
+
+    logger.info(
+        "Building camera BVH from %s meshes (%s full, %s bbox, %s verts)",
+        len(objs),
+        n_full,
+        n_box,
+        len(all_verts),
+    )
+    bvh = BVHTree.FromPolygons(all_verts, all_faces, all_triangles=True)
 
     camera_selection_answers = {}
     for q0 in tags_queries:
@@ -737,19 +835,7 @@ def build_bvh_and_attrs(objs, tags_queries):
             q = q0
         if q[0] in [SelectionCriterions.CloseUp]:
             continue
-        if q[0] == SelectionCriterions.Altitude:
-            min_altitude, max_altitude = q[1:3]
-            altitude = mesh.vertices[:, 2]
-            camera_selection_answers[q0] = mesh.facewise_mean(
-                (altitude > min_altitude) & (altitude < max_altitude)
-            )
-        else:
-            camera_selection_answers[q0] = np.zeros(len(mesh.faces), dtype=bool)
-            for key in tag_system.tag_dict:
-                if set(q).issubset(set(key.split("."))):
-                    camera_selection_answers[q0] |= (
-                        mesh.face_attributes["MaskTag"] == tag_system.tag_dict[key]
-                    ).reshape(-1)
+        camera_selection_answers[q0] = np.zeros(0, dtype=bool)
     return bvh, camera_selection_answers
 
 
@@ -791,9 +877,10 @@ def camera_selection_preprocessing(
         placeholders_kd = butil.joined_kd(placeholders, include_origins=True)
 
     if terrain is None:
-        scene_bvh, camera_selection_answers = build_bvh_and_attrs(
-            scene_objs, all_selection_ratios.keys()
-        )
+        with Timer("Building scene BVH"):
+            scene_bvh, camera_selection_answers = build_bvh_and_attrs(
+                scene_objs, all_selection_ratios.keys()
+            )
         vertexwise_min_dist = None
     else:
         scene_bvh, camera_selection_answers, vertexwise_min_dist = (

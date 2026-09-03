@@ -204,7 +204,18 @@ class SimulatedAnnealingSolver:
                 )
                 break
 
-            succeeded = move.apply(state)
+            try:
+                succeeded = move.apply(state)
+            except FileNotFoundError as e:
+                logger.warning("Skipping %s: missing asset (%s)", move, e)
+                if getattr(move, "_new_obj", None) is not None:
+                    try:
+                        move.revert(state)
+                    except Exception:
+                        logger.debug(
+                            "Could not revert after missing asset", exc_info=True
+                        )
+                continue
             if succeeded:
                 eval_memo.evict_memo_for_move(consgraph, state, self.eval_memo, move)
                 result = self._move(consgraph, state, move, filter_domain)

@@ -84,7 +84,10 @@ configure_photo_cycles.look = "AgX - Base Contrast"
 restore_ceiling_fixture_visibility.enabled = True
 
 # --- Defect cameras (must be set at coarse time for new rigs) ---
+# Cap extras: one-to-one with every defect OOMs apartment coarse (100+ grids
+# duplicated into the camera BVH). Sampling is stratified by defect kind.
 camera.add_defect_focus.enabled = True
+camera.add_defect_focus.max_rigs = 24
 camera.pose_defect_cameras.distance = 0.9
 camera.pose_defect_cameras.focal_length = 3.7
 camera.pose_defect_cameras.height_jitter = 0.08

@@ -602,37 +602,69 @@ def room_stairs(constants, state, rooms_meshed):
         return
 
     contours, doors = [], []
-    for k, s in state.objs.items():
-        if k.startswith(t.Semantics.StaircaseRoom.value):
-            doors_ = [
-                bpy.data.objects[l]
-                for l, o in state.objs.items()
-                if any(
-                    r.relation == cl.CutFrom() and r.target_name == k
-                    for r in o.relations
-                )
-                and l.startswith("door")
-            ]
-            p = shapely.Polygon(s.polygon)
-            contour = shapely.simplify(
-                p.buffer(-constants.wall_thickness / 2, join_style="mitre"), 0.1
+    # Sorted by storey: `geoms` below pairs consecutive entries and the
+    # placeholder z is set from the list index, so relying on dict insertion
+    # order silently builds the flight between the wrong pair of floors.
+    stair_rooms = sorted(
+        (k for k in state.objs if k.startswith(t.Semantics.StaircaseRoom.value)),
+        key=room_level,
+    )
+    for k in stair_rooms:
+        s = state.objs[k]
+        doors_ = [
+            bpy.data.objects[l]
+            for l, o in state.objs.items()
+            if any(
+                r.relation == cl.CutFrom() and r.target_name == k
+                for r in o.relations
             )
-            for door in doors_:
-                dw = constants.door_width
-                box = shapely.box(-dw / 2, -dw * 1.5, dw / 2, dw * 1.5)
-                box = shapely.affinity.translate(
-                    shapely.affinity.rotate(box, door.rotation_euler[-1]),
-                    *door.location,
-                )
-                contour = contour.difference(box)
-            doors.append(doors_)
-            contours.append(contour)
+            and l.startswith("door")
+        ]
+        p = shapely.Polygon(s.polygon)
+        contour = shapely.simplify(
+            p.buffer(-constants.wall_thickness / 2, join_style="mitre"), 0.1
+        )
+        for door in doors_:
+            dw = constants.door_width
+            box = shapely.box(-dw / 2, -dw * 1.5, dw / 2, dw * 1.5)
+            box = shapely.affinity.translate(
+                shapely.affinity.rotate(box, door.rotation_euler[-1]),
+                *door.location,
+            )
+            contour = contour.difference(box)
+        doors.append(doors_)
+        contours.append(contour)
+
+    if len(contours) < 2:
+        logger.warning(
+            "room_stairs: %s staircase room(s) (%s) - need at least two "
+            "consecutive storeys to connect, no stairs built",
+            len(contours), ", ".join(stair_rooms) or "none",
+        )
+        return
 
     geoms = []
     for c, c_ in zip(contours[:-1], contours[1:]):
         geoms.append(c.intersection(c_).buffer(0))
+    # A flight needs a long run in one axis; report the usable footprint so a
+    # failure below can be read as "the storeys barely stack" rather than as
+    # some opaque sampler problem.
+    for j, g in enumerate(geoms):
+        if g.is_empty:
+            logger.warning(
+                "room_stairs: %s and %s do not overlap in plan - a flight "
+                "between them is impossible",
+                stair_rooms[j], stair_rooms[j + 1],
+            )
+        else:
+            bx0, by0, bx1, by1 = g.bounds
+            logger.info(
+                "room_stairs: %s->%s stackable footprint %.2f m2 (%.2f x %.2f m)",
+                stair_rooms[j], stair_rooms[j + 1], g.area, bx1 - bx0, by1 - by0,
+            )
 
     placeholders, offsets, fns = [], [], []
+    n_no_fit = 0
     for _ in trange(200, desc="Generating staircases: "):
         butil.delete(placeholders)
         fns = [
@@ -659,6 +691,7 @@ def room_stairs(constants, state, rooms_meshed):
             lower.append((x[z < constants.wall_height], y[z < constants.wall_height]))
             upper.append((x[z >= constants.wall_height], y[z >= constants.wall_height]))
         if any(p.is_empty for p in mlss):
+            n_no_fit += 1
             continue
         for _ in range(50):
             offsets = []
@@ -726,6 +759,19 @@ def room_stairs(constants, state, rooms_meshed):
             break
     butil.delete(placeholders)
     if len(offsets) != len(geoms):
+        extents = ", ".join(
+            "empty" if g.is_empty else
+            f"{g.bounds[2] - g.bounds[0]:.2f}x{g.bounds[3] - g.bounds[1]:.2f} m"
+            for g in geoms
+        )
+        logger.warning(
+            "room_stairs: no staircase placed after 200 attempts (%s of them "
+            "had no room for the flight at all). Stackable footprint between "
+            "storeys: %s. Staircase factories need roughly 4-5 m of run in one "
+            "axis, so the storeys probably do not overlap enough - see "
+            "staircase_thresh in RoomConstants.",
+            n_no_fit, extents,
+        )
         return
     for j, fn in enumerate(tqdm(fns)):
         s = fn(i=np.random.randint(1e7))
@@ -1042,6 +1088,37 @@ _WALL_FIXTURE_HEIGHTS = (
 )
 
 
+def _room_for_fixture(rooms, aabb, claim=1.0):
+    """Nearest room in plan, restricted to the storey the fixture is on.
+
+    `rooms` is (name, footprint, soffit_z, floor_z). Stacked storeys share an
+    XY footprint, so matching on plan distance alone scores both at zero and
+    `min` keeps whichever happens to come first - handing back another floor's
+    soffit. That is invisible with one storey and drives wall fittings into the
+    slab with two.
+
+    Rooms whose z band contains the fixture are preferred; ties fall back to
+    plan distance exactly as before, so single-storey behaviour is unchanged.
+    Returns None when nothing is within `claim`.
+    """
+    x0, y0, z0, x1, y1, z1 = aabb
+    pt = shapely.Point((x0 + x1) / 2, (y0 + y1) / 2)
+    zc = (z0 + z1) / 2
+
+    def storey_miss(r):
+        soffit, floor_z = r[2], r[3]
+        if zc < floor_z:
+            return floor_z - zc
+        if zc > soffit:
+            return zc - soffit
+        return 0.0
+
+    best = min(rooms, key=lambda r: (storey_miss(r), r[1].distance(pt)))
+    if best[1].distance(pt) > claim:
+        return None
+    return best
+
+
 def _push_runs_to_wall(
     rooms,
     gap=0.005,
@@ -1068,11 +1145,12 @@ def _push_runs_to_wall(
             continue
         if not len(o.data.vertices) or "placeholder" in o.name:
             continue
-        x0, y0, _, x1, y1, _ = _world_aabb(o)
-        pt = shapely.Point((x0 + x1) / 2, (y0 + y1) / 2)
-        name, foot, _, _ = min(rooms, key=lambda r: r[1].distance(pt))
-        if foot.distance(pt) > claim:
+        aabb = _world_aabb(o)
+        x0, y0, _, x1, y1, _ = aabb
+        hit = _room_for_fixture(rooms, aabb, claim)
+        if hit is None:
             continue
+        name, foot, _, _ = hit
 
         # Free run to the wall on each side, measured only across the object's
         # own footprint so a doorway elsewhere on the wall does not count.
@@ -1251,11 +1329,12 @@ def _clamp_kitchen_runs_under_beams(rooms, gap=0.03, tokens=("KitchenSpace",), c
             continue
         if not len(o.data.vertices) or "placeholder" in o.name:
             continue
-        x0, y0, z0, x1, y1, z1 = _world_aabb(o)
-        pt = shapely.Point((x0 + x1) / 2, (y0 + y1) / 2)
-        name, foot, soffit, _ = min(rooms, key=lambda r: r[1].distance(pt))
-        if foot.distance(pt) > claim:
+        aabb = _world_aabb(o)
+        x0, y0, z0, x1, y1, z1 = aabb
+        hit = _room_for_fixture(rooms, aabb, claim)
+        if hit is None:
             continue
+        name, foot, soffit, _ = hit
         limit = soffit - gap
         if z1 <= limit or z1 - z0 < 1e-3:
             continue
@@ -1298,11 +1377,12 @@ def _snap_wall_fixture_heights(rooms, claim=1.0, margin=0.03):
             continue
         _, ref, offset, edge = spec
 
-        x0, y0, z0, x1, y1, z1 = _world_aabb(o)
-        pt = shapely.Point((x0 + x1) / 2, (y0 + y1) / 2)
-        name, foot, soffit, floor_z = min(rooms, key=lambda r: r[1].distance(pt))
-        if foot.distance(pt) > claim:
+        aabb = _world_aabb(o)
+        x0, y0, z0, x1, y1, z1 = aabb
+        hit = _room_for_fixture(rooms, aabb, claim)
+        if hit is None:
             continue
+        name, foot, soffit, floor_z = hit
 
         base = soffit if ref == "soffit" else floor_z
         target = base - offset if ref == "soffit" else base + offset
@@ -1382,7 +1462,7 @@ def _follow_defect_cameras(target, dx, dy):
         o.location.y += dy
 
 
-def _nudge_ceiling_fixtures_off_beams(beams, margin=0.05):
+def _nudge_ceiling_fixtures_off_beams(beams, margin=0.05, defect_z_tol=0.5):
     """Slide ceiling lights, extract fans and ceiling defects off downstand beams.
 
     Beams are generated after the solver, which only sees the ceiling slab, so
@@ -1390,8 +1470,11 @@ def _nudge_ceiling_fixtures_off_beams(beams, margin=0.05):
     does; carving the beam is the fallback for wall-mounted objects.
 
     Ceiling defects sit in the slab (slightly embedded *up*), so they often
-    miss a Z-overlap test against a beam that hangs *down*. Those use XY
-    footprint only.
+    miss a strict Z-overlap test against a beam that hangs *down*; they get a
+    `defect_z_tol` window instead. It has to be a window and not "ignore Z":
+    `beams` spans every storey, and with XY alone a defect matches the beams
+    of the floor above and below too, so every ceiling defect in a multi-storey
+    scene gets slid sideways to dodge a beam that is metres away.
     """
     tokens = ("CeilingLight", "ExhaustFan")
     if not beams:
@@ -1414,7 +1497,8 @@ def _nudge_ceiling_fixtures_off_beams(beams, margin=0.05):
                     continue
                 if y1 + margin <= by0 or y0 - margin >= by1:
                     continue
-                if not is_defect and (z1 < bz0 or z0 > bz1):
+                z_tol = defect_z_tol if is_defect else 0.0
+                if z1 < bz0 - z_tol or z0 > bz1 + z_tol:
                     continue
                 hit = b
                 break
